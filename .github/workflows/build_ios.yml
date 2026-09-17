@@ -118,9 +118,7 @@ jobs:
 
       - name: Install provisioning profile
         run: |
-          PP_UUID=$(grep -a 'UUID' /tmp/profile.mobileprovision \
-            | grep -o '[0-9a-f]\{8\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{12\}' \
-            | head -1)
+          PP_UUID=$(security cms -D -i /tmp/profile.mobileprovision | plutil -extract UUID raw -o - -)
           TEAM_ID=$(security cms -D -i /tmp/profile.mobileprovision | plutil -extract TeamIdentifier.0 raw -o - -)
           BUNDLE_ID_RAW=$(security cms -D -i /tmp/profile.mobileprovision | plutil -extract Entitlements.application-identifier raw -o - -)
           # application-identifier is "TEAMID.bundle.id" - strip the "TEAMID." prefix
@@ -131,6 +129,11 @@ jobs:
           echo "Team ID: $TEAM_ID"
           echo "Bundle ID: $BUNDLE_ID"
           echo "Profile name: $PROFILE_NAME"
+
+          if [ -z "$PP_UUID" ] || [ -z "$TEAM_ID" ] || [ -z "$BUNDLE_ID" ]; then
+            echo "::error::Failed to extract one or more required values from the provisioning profile."
+            exit 1
+          fi
 
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp /tmp/profile.mobileprovision \
