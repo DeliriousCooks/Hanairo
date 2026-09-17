@@ -160,28 +160,26 @@ jobs:
 
       - name: xcodebuild archive
         run: |
+          set -o pipefail
           cd ios
           xcodebuild archive \
             -workspace Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
             -archivePath /tmp/BooruGallery.xcarchive \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM=SE4UL3VJW5 \
-            CODE_SIGN_IDENTITY="iPhone Distribution: qa ba (SE4UL3VJW5)" \
-            PROVISIONING_PROFILE_SPECIFIER="e52b0627-df22-4cd5-b59f-a1224fad20ed" \
-            PRODUCT_BUNDLE_IDENTIFIER=app.starfruit8199.snowleopard5722 \
+            -destination "generic/platform=iOS" \
             OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_NAME" \
             2>&1 | tee /tmp/archive.log | tail -80
 
       - name: Export IPA
         run: |
+          set -o pipefail
           mkdir -p build/ios/ipa
           xcodebuild -exportArchive \
             -archivePath /tmp/BooruGallery.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist ios/ExportOptions.plist \
-            2>&1 | tail -30
+            2>&1 | tee /tmp/export.log | tail -30
           find build/ios/ipa -name "*.ipa" -ls
 
       - name: Rename IPA
@@ -205,8 +203,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-log-${{ github.run_number }}
-          path: /tmp/archive.log
+          path: |
+            /tmp/archive.log
+            /tmp/export.log
           retention-days: 7
+          if-no-files-found: ignore
 
       - name: Cleanup
         if: always()
