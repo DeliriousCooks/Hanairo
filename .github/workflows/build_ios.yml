@@ -30,6 +30,18 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      - name: Ensure iOS platform files exist
+        run: |
+          if [ ! -f "ios/Runner.xcodeproj/project.pbxproj" ]; then
+            echo "ios/Runner.xcodeproj is missing from the repo — regenerating iOS platform files with 'flutter create'."
+            echo "This will NOT overwrite files that already exist (like your customized Info.plist)."
+            flutter create --platforms=ios --project-name booru_aggregator --org app.starfruit8199 .
+          fi
+          if [ ! -f "ios/Runner.xcodeproj/project.pbxproj" ]; then
+            echo "::error::ios/Runner.xcodeproj/project.pbxproj still missing after 'flutter create'. Aborting."
+            exit 1
+          fi
+
       - name: Decode P12
         run: |
           echo "${{ secrets.P12_BASE64 }}" | base64 --decode > /tmp/cert.p12
