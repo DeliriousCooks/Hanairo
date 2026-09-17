@@ -1,0 +1,61 @@
+# Fastfile — manual signing via imported P12 + mobileprovision
+# No match/certificate fetching needed; CI imports the secrets directly
+
+default_platform(:ios)
+
+platform :ios do
+
+  desc "Build a signed Ad Hoc IPA using imported P12 and provisioning profile"
+  lane :build_adhoc do
+
+    # ── 1. Import the distribution certificate from the P12 ──────────────────
+    import_certificate(
+      certificate_path:     ENV["P12_PATH"],
+      certificate_password: ENV["P12_PASSWORD"],
+      keychain_name:        ENV["KEYCHAIN_NAME"]    || "build.keychain",
+      keychain_password:    ENV["KEYCHAIN_PASSWORD"] || "temporary_keychain_pw"
+    )
+
+    # ── 2. Install the provisioning profile ──────────────────────────────────
+    install_provisioning_profile(
+      path: ENV["MOBILEPROVISION_PATH"]
+    )
+
+    # ── 3. Update Xcode project bundle ID & signing ──────────────────────────
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path:                  "ios/Runner.xcodeproj",
+      bundle_identifier:     "app.starfruit8199.snowleopard5722",
+      team_id:               "SE4UL3VJW5",
+      profile_uuid:          "e52b0627-df22-4cd5-b59f-a1224fad20ed",
+      code_sign_identity:    "iPhone Distribution: qa ba (SE4UL3VJW5)"
+    )
+
+    # ── 4. Build Flutter ──────────────────────────────────────────────────────
+    sh("flutter build ios --release --no-codesign")
+
+    # ── 5. Archive & export IPA ───────────────────────────────────────────────
+    build_app(
+      scheme:                  "Runner",
+      workspace:               "ios/Runner.xcworkspace",
+      configuration:           "Release",
+      export_method:           "ad-hoc",
+      export_options:          {
+        method:               "ad-hoc",
+        teamID:               "SE4UL3VJW5",
+        signingStyle:         "manual",
+        signingCertificate:   "iPhone Distribution: qa ba (SE4UL3VJW5)",
+        provisioningProfiles: {
+          "app.starfruit8199.snowleopard5722" => "e52b0627-df22-4cd5-b59f-a1224fad20ed"
+        }
+      },
+      output_directory:        "build/ios/ipa",
+      output_name:             "BooruGallery_AdHoc.ipa",
+      clean:                   false,
+      skip_package_dependencies_resolution: false
+    )
+
+    UI.success "✅ IPA built: build/ios/ipa/BooruGallery_AdHoc.ipa"
+  end
+
+end
