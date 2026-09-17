@@ -15,7 +15,6 @@ jobs:
       FLUTTER_VERSION: '3.19.6'
       KEYCHAIN_NAME: build.keychain
       KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-      P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -51,25 +50,36 @@ jobs:
 
       - name: Import P12 certificate
         run: |
-          # Re-export via openssl to normalise format — fixes "wrong password" on short passwords
-          openssl pkcs12 \
-            -in /tmp/cert.p12 \
-            -passin pass:${{ secrets.P12_PASSWORD }} \
-            -passout pass:exporttemp123 \
-            -out /tmp/cert_converted.p12 \
-            -export -legacy 2>/dev/null || \
-          openssl pkcs12 \
-            -in /tmp/cert.p12 \
-            -passin pass:${{ secrets.P12_PASSWORD }} \
-            -passout pass:exporttemp123 \
-            -out /tmp/cert_converted.p12 \
-            -export
+          echo "P12 size: $(wc -c < /tmp/cert.p12) bytes"
 
-          echo "Converted P12 size: $(wc -c < /tmp/cert_converted.p12) bytes"
+          # Step 1: extract cert + key to unencrypted PEM
+          # try -legacy first (for older P12 formats), fall back to default
+          if ! openssl pkcs12 \
+              -in /tmp/cert.p12 \
+              -passin pass:${{ secrets.P12_PASSWORD }} \
+              -nodes -out /tmp/cert_and_key.pem -legacy 2>/dev/null; then
+            openssl pkcs12 \
+              -in /tmp/cert.p12 \
+              -passin pass:${{ secrets.P12_PASSWORD }} \
+              -nodes -out /tmp/cert_and_key.pem
+          fi
 
-          security import /tmp/cert_converted.p12 \
+          echo "PEM size: $(wc -c < /tmp/cert_and_key.pem) bytes"
+
+          # Step 2: re-pack into a fresh P12 with a known-safe password
+          openssl pkcs12 \
+            -in /tmp/cert_and_key.pem \
+            -passin pass: \
+            -export \
+            -passout pass:TempCert999 \
+            -out /tmp/cert_final.p12
+
+          echo "Final P12 size: $(wc -c < /tmp/cert_final.p12) bytes"
+
+          # Step 3: import into keychain
+          security import /tmp/cert_final.p12 \
             -k "$KEYCHAIN_NAME" \
-            -P "exporttemp123" \
+            -P "TempCert999" \
             -T /usr/bin/codesign \
             -T /usr/bin/security \
             -f pkcs12
@@ -120,7 +130,7 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="e52b0627-df22-4cd5-b59f-a1224fad20ed" \
             PRODUCT_BUNDLE_IDENTIFIER=app.starfruit8199.snowleopard5722 \
             OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_NAME" \
-            2>&1 | tee /tmp/archive.log | tail -50
+            2>&1 | tee /tmp/archive.log | tail -80
 
       - name: Export IPA
         run: |
@@ -160,7 +170,7 @@ jobs:
         if: always()
         run: |
           security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
-          rm -f /tmp/cert.p12 /tmp/cert_converted.p12 /tmp/profile.mobileprovision
+          rm -f /tmp/cert.p12 /tmp/cert_and_key.pem /tmp/cert_final.p12 /tmp/profile.mobileprovision
 
       - name: Build summary
         if: success()
