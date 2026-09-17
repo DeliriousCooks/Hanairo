@@ -1,0 +1,228 @@
+name: Build & Sign iOS IPA
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      clean_build:
+        description: 'Force clean build'
+        required: false
+        default: 'false'
+        type: boolean
+
+# ─── Required Secrets (add these in GitHub → Settings → Secrets → Actions) ───
+# P12_BASE64            : base64 of your .p12 file
+# P12_PASSWORD          : kravasign  (your cert password)
+# MOBILEPROVISION_BASE64: base64 of your .mobileprovision file
+# KEYCHAIN_PASSWORD     : any random string, e.g. "ci_keychain_pw_2024"
+
+jobs:
+  build-ios:
+    name: Build Signed IPA
+    runs-on: macos-14          # Apple Silicon runner (M1) — fastest & cheapest
+    timeout-minutes: 60
+
+    env:
+      FLUTTER_VERSION: '3.19.6'
+      KEYCHAIN_NAME: build.keychain
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+
+    steps:
+      # ── 0. Checkout ─────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 1. Setup Flutter ─────────────────────────────────────────────────────
+      - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      # ── 2. Flutter dependencies ───────────────────────────────────────────────
+      - name: Get Flutter packages
+        run: flutter pub get
+
+      # ── 3. Decode & install P12 certificate ──────────────────────────────────
+      - name: Decode P12 from secret
+        run: |
+          echo "${{ secrets.P12_BASE64 }}" | base64 --decode > /tmp/cert.p12
+          echo "P12 decoded, size: $(wc -c < /tmp/cert.p12) bytes"
+
+      - name: Decode provisioning profile from secret
+        run: |
+          echo "${{ secrets.MOBILEPROVISION_BASE64 }}" | base64 --decode > /tmp/profile.mobileprovision
+          echo "Profile decoded, size: $(wc -c < /tmp/profile.mobileprovision) bytes"
+
+      # ── 4. Create temporary keychain and import certificate ───────────────────
+      - name: Create keychain
+        run: |
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_NAME"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          # Add to keychain search list
+          security list-keychains -d user -s "$KEYCHAIN_NAME" $(security list-keychains -d user | xargs)
+          security default-keychain -s "$KEYCHAIN_NAME"
+
+      - name: Import P12 certificate into keychain
+        run: |
+          security import /tmp/cert.p12 \
+            -k "$KEYCHAIN_NAME" \
+            -P "$P12_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          # Allow codesign to access without password prompt
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_NAME"
+          # Verify
+          security find-identity -v -p codesigning "$KEYCHAIN_NAME"
+
+      # ── 5. Install provisioning profile ──────────────────────────────────────
+      - name: Install provisioning profile
+        run: |
+          PP_UUID=$(grep -a 'UUID' /tmp/profile.mobileprovision \
+            | grep -o '[0-9a-f]\{8\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{12\}' \
+            | head -1)
+          echo "Profile UUID: $PP_UUID"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp /tmp/profile.mobileprovision \
+            ~/Library/MobileDevice/Provisioning\ Profiles/${PP_UUID}.mobileprovision
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      # ── 6. Set bundle ID & signing in Xcode project ───────────────────────────
+      - name: Configure Xcode signing
+        run: |
+          # Patch project.pbxproj with correct bundle ID, team, profile UUID
+          PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
+          
+          # Bundle identifier
+          sed -i '' \
+            's/PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = app.starfruit8199.snowleopard5722;/g' \
+            "$PBXPROJ"
+          
+          # Team ID
+          sed -i '' \
+            's/DEVELOPMENT_TEAM = .*/DEVELOPMENT_TEAM = SE4UL3VJW5;/g' \
+            "$PBXPROJ"
+          
+          # Disable automatic signing
+          sed -i '' \
+            's/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Manual;/g' \
+            "$PBXPROJ"
+          
+          # Set provisioning profile specifier
+          sed -i '' \
+            's/PROVISIONING_PROFILE_SPECIFIER = .*/PROVISIONING_PROFILE_SPECIFIER = "e52b0627-df22-4cd5-b59f-a1224fad20ed";/g' \
+            "$PBXPROJ"
+          
+          # Set code sign identity
+          sed -i '' \
+            's/CODE_SIGN_IDENTITY = .*/CODE_SIGN_IDENTITY = "iPhone Distribution: qa ba (SE4UL3VJW5)";/g' \
+            "$PBXPROJ"
+          
+          echo "✅ Xcode project patched"
+          grep -A2 "PRODUCT_BUNDLE_IDENTIFIER\|DEVELOPMENT_TEAM\|CODE_SIGN_STYLE" "$PBXPROJ" | head -20
+
+      # ── 7. Flutter build (no-codesign, we codesign ourselves) ────────────────
+      - name: Flutter build iOS (release, no-codesign)
+        run: |
+          flutter build ios \
+            --release \
+            --no-codesign \
+            --dart-define=FLUTTER_APP_BUILD=release
+
+      # ── 8. Archive with xcodebuild ────────────────────────────────────────────
+      - name: xcodebuild archive
+        run: |
+          cd ios
+          xcodebuild archive \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath /tmp/BooruGallery.xcarchive \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=SE4UL3VJW5 \
+            CODE_SIGN_IDENTITY="iPhone Distribution: qa ba (SE4UL3VJW5)" \
+            PROVISIONING_PROFILE_SPECIFIER="e52b0627-df22-4cd5-b59f-a1224fad20ed" \
+            PRODUCT_BUNDLE_IDENTIFIER=app.starfruit8199.snowleopard5722 \
+            -allowProvisioningUpdates \
+            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_NAME" \
+            2>&1 | tee /tmp/archive.log | tail -50
+          
+          echo "Archive result: $?"
+          ls -la /tmp/BooruGallery.xcarchive/
+
+      # ── 9. Export IPA ─────────────────────────────────────────────────────────
+      - name: Export IPA
+        run: |
+          mkdir -p build/ios/ipa
+          xcodebuild -exportArchive \
+            -archivePath /tmp/BooruGallery.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            2>&1 | tail -30
+          
+          echo "--- IPA output ---"
+          find build/ios/ipa -name "*.ipa" -ls
+
+      # ── 10. Rename IPA with git info ──────────────────────────────────────────
+      - name: Rename IPA
+        run: |
+          SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          BRANCH="${{ github.ref_name }}"
+          find build/ios/ipa -name "*.ipa" | while read f; do
+            mv "$f" "build/ios/ipa/BooruGallery_AdHoc_${BRANCH}_${SHA}.ipa"
+          done
+          ls -lh build/ios/ipa/
+
+      # ── 11. Upload IPA as artifact ────────────────────────────────────────────
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BooruGallery-IPA-${{ github.ref_name }}-${{ github.run_number }}
+          path: build/ios/ipa/*.ipa
+          retention-days: 30
+          if-no-files-found: error
+
+      # ── 12. Upload build log on failure ───────────────────────────────────────
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ github.run_number }}
+          path: /tmp/archive.log
+          retention-days: 7
+
+      # ── 13. Cleanup keychain ──────────────────────────────────────────────────
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
+          rm -f /tmp/cert.p12 /tmp/profile.mobileprovision
+
+      # ── 14. Job summary ───────────────────────────────────────────────────────
+      - name: Build summary
+        if: success()
+        run: |
+          echo "## ✅ IPA Build Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Bundle ID | \`app.starfruit8199.snowleopard5722\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Team | qa ba (SE4UL3VJW5) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Profile | e52b0627-df22-4cd5-b59f-a1224fad20ed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Method | Ad Hoc |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          IPA=$(find build/ios/ipa -name "*.ipa" | head -1)
+          echo "**IPA:** $(basename $IPA)" >> $GITHUB_STEP_SUMMARY
+          echo "**Size:** $(du -h $IPA | cut -f1)" >> $GITHUB_STEP_SUMMARY
