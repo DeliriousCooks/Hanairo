@@ -104,32 +104,71 @@ jobs:
           # Should show: iPhone Distribution: qa ba (SE4UL3VJW5)
           security find-identity -v -p codesigning "$KEYCHAIN_NAME"
 
+          # Extract the identity string (between quotes on the first match) instead of
+          # hardcoding it, since it depends on whichever cert is in the P12 secret.
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_NAME" \
+            | head -1 \
+            | sed -E 's/^[[:space:]]*[0-9]+\)[[:space:]]+[0-9A-F]+[[:space:]]+"(.*)"$/\1/')
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::Could not find a valid codesigning identity in the keychain after import."
+            exit 1
+          fi
+          echo "Codesign identity: $IDENTITY"
+          echo "CODE_SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+
       - name: Install provisioning profile
         run: |
           PP_UUID=$(grep -a 'UUID' /tmp/profile.mobileprovision \
             | grep -o '[0-9a-f]\{8\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{12\}' \
             | head -1)
+          TEAM_ID=$(security cms -D -i /tmp/profile.mobileprovision | plutil -extract TeamIdentifier.0 raw -o - -)
+          BUNDLE_ID_RAW=$(security cms -D -i /tmp/profile.mobileprovision | plutil -extract Entitlements.application-identifier raw -o - -)
+          # application-identifier is "TEAMID.bundle.id" - strip the "TEAMID." prefix
+          BUNDLE_ID="${BUNDLE_ID_RAW#${TEAM_ID}.}"
+          PROFILE_NAME=$(security cms -D -i /tmp/profile.mobileprovision | plutil -extract Name raw -o - -)
+
           echo "Profile UUID: $PP_UUID"
+          echo "Team ID: $TEAM_ID"
+          echo "Bundle ID: $BUNDLE_ID"
+          echo "Profile name: $PROFILE_NAME"
+
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp /tmp/profile.mobileprovision \
             ~/Library/MobileDevice/Provisioning\ Profiles/${PP_UUID}.mobileprovision
           ls ~/Library/MobileDevice/Provisioning\ Profiles/
 
+          # Make these available to later steps instead of hardcoding them
+          echo "PP_UUID=$PP_UUID" >> "$GITHUB_ENV"
+          echo "TEAM_ID=$TEAM_ID" >> "$GITHUB_ENV"
+          echo "BUNDLE_ID=$BUNDLE_ID" >> "$GITHUB_ENV"
+
       - name: Configure Xcode signing
         run: |
           python3 - <<'PYEOF'
+          import os
           import re
 
           path = "ios/Runner.xcodeproj/project.pbxproj"
           with open(path) as f:
               content = f.read()
 
+          def required_env(name):
+              val = os.environ.get(name, "")
+              if not val:
+                  raise SystemExit(f"Missing required env var {name} - an earlier step should have set it.")
+              return val
+
+          bundle_id = required_env("BUNDLE_ID")
+          team_id = required_env("TEAM_ID")
+          pp_uuid = required_env("PP_UUID")
+          identity = required_env("CODE_SIGN_IDENTITY")
+
           settings = {
-              "PRODUCT_BUNDLE_IDENTIFIER": "app.starfruit8199.snowleopard5722",
-              "DEVELOPMENT_TEAM": "SE4UL3VJW5",
+              "PRODUCT_BUNDLE_IDENTIFIER": bundle_id,
+              "DEVELOPMENT_TEAM": team_id,
               "CODE_SIGN_STYLE": "Manual",
-              "PROVISIONING_PROFILE_SPECIFIER": '"e52b0627-df22-4cd5-b59f-a1224fad20ed"',
-              "CODE_SIGN_IDENTITY": '"iPhone Distribution: qa ba (SE4UL3VJW5)"',
+              "PROVISIONING_PROFILE_SPECIFIER": f'"{pp_uuid}"',
+              "CODE_SIGN_IDENTITY": f'"{identity}"',
           }
 
           def patch_block(match):
@@ -152,7 +191,9 @@ jobs:
           with open(path, "w") as f:
               f.write(content)
 
-          print("Xcode project patched (inserted any missing signing keys, updated existing ones)")
+          print("Xcode project patched with values read from the actual cert/profile:")
+          for k, v in settings.items():
+              print(f"  {k} = {v}")
           PYEOF
 
       - name: Flutter build iOS
@@ -170,6 +211,37 @@ jobs:
             -destination "generic/platform=iOS" \
             OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_NAME" \
             2>&1 | tee /tmp/archive.log | tail -80
+
+      - name: Generate ExportOptions.plist
+        run: |
+          cat > ios/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>ad-hoc</string>
+              <key>teamID</key>
+              <string>${TEAM_ID}</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>signingCertificate</key>
+              <string>${CODE_SIGN_IDENTITY}</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>${BUNDLE_ID}</key>
+                  <string>${PP_UUID}</string>
+              </dict>
+              <key>compileBitcode</key>
+              <false/>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>thinning</key>
+              <string>&lt;none&gt;</string>
+          </dict>
+          </plist>
+          EOF
+          cat ios/ExportOptions.plist
 
       - name: Export IPA
         run: |
@@ -221,6 +293,6 @@ jobs:
           echo "## ✅ IPA Build Successful" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Bundle ID | \`app.starfruit8199.snowleopard5722\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Team | qa ba (SE4UL3VJW5) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Bundle ID | \`${BUNDLE_ID}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Team | ${CODE_SIGN_IDENTITY} |" >> $GITHUB_STEP_SUMMARY
           echo "| Method | Ad Hoc |" >> $GITHUB_STEP_SUMMARY
