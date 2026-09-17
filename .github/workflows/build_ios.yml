@@ -117,13 +117,43 @@ jobs:
 
       - name: Configure Xcode signing
         run: |
-          PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
-          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = app.starfruit8199.snowleopard5722;/g' "$PBXPROJ"
-          sed -i '' 's/DEVELOPMENT_TEAM = .*/DEVELOPMENT_TEAM = SE4UL3VJW5;/g' "$PBXPROJ"
-          sed -i '' 's/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Manual;/g' "$PBXPROJ"
-          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = .*/PROVISIONING_PROFILE_SPECIFIER = "e52b0627-df22-4cd5-b59f-a1224fad20ed";/g' "$PBXPROJ"
-          sed -i '' 's/CODE_SIGN_IDENTITY = .*/CODE_SIGN_IDENTITY = "iPhone Distribution: qa ba (SE4UL3VJW5)";/g' "$PBXPROJ"
-          echo "Xcode project patched"
+          python3 - <<'PYEOF'
+          import re
+
+          path = "ios/Runner.xcodeproj/project.pbxproj"
+          with open(path) as f:
+              content = f.read()
+
+          settings = {
+              "PRODUCT_BUNDLE_IDENTIFIER": "app.starfruit8199.snowleopard5722",
+              "DEVELOPMENT_TEAM": "SE4UL3VJW5",
+              "CODE_SIGN_STYLE": "Manual",
+              "PROVISIONING_PROFILE_SPECIFIER": '"e52b0627-df22-4cd5-b59f-a1224fad20ed"',
+              "CODE_SIGN_IDENTITY": '"iPhone Distribution: qa ba (SE4UL3VJW5)"',
+          }
+
+          def patch_block(match):
+              block = match.group(0)
+              for key, val in settings.items():
+                  pattern = re.compile(rf"{key} = [^;]*;")
+                  if pattern.search(block):
+                      block = pattern.sub(f"{key} = {val};", block)
+                  else:
+                      block = re.sub(
+                          r"(buildSettings = \{\n)",
+                          rf"\1\t\t\t\t{key} = {val};\n",
+                          block,
+                          count=1,
+                      )
+              return block
+
+          content = re.sub(r"buildSettings = \{[^}]*\};", patch_block, content, flags=re.S)
+
+          with open(path, "w") as f:
+              f.write(content)
+
+          print("Xcode project patched (inserted any missing signing keys, updated existing ones)")
+          PYEOF
 
       - name: Flutter build iOS
         run: flutter build ios --release --no-codesign --no-tree-shake-icons
