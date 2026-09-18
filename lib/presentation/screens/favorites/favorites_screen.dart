@@ -72,7 +72,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           PostGridSliver(
             posts: _favorites,
             onPostTapped: (post, index) {
-              context.go('/viewer', extra: {
+              context.push('/viewer', extra: {
                 'posts': _favorites,
                 'index': index,
               });
