@@ -148,29 +148,27 @@ class _ThemeWrapperState extends State<_ThemeWrapper> {
   }
 }
 
-class MainShell extends StatefulWidget {
+class MainShell extends StatelessWidget {
   final Widget child;
   const MainShell({super.key, required this.child});
 
-  @override
-  State<MainShell> createState() => _MainShellState();
-}
-
-class _MainShellState extends State<MainShell> {
-  int _selectedIndex = 0;
-
   static const _routes = ['/', '/search', '/favorites', '/settings'];
+
+  int _indexForLocation(BuildContext context) {
+    final location = GoRouterState.of(context).uri.path;
+    final index = _routes.indexOf(location);
+    return index == -1 ? 0 : index;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
       extendBodyBehindAppBar: true,
-      body: widget.child,
+      body: child,
       bottomNavigationBar: _BottomNav(
-        selectedIndex: _selectedIndex,
+        selectedIndex: _indexForLocation(context),
         onDestinationSelected: (index) {
-          setState(() => _selectedIndex = index);
           context.go(_routes[index]);
         },
       ),
