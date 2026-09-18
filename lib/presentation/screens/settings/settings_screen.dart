@@ -147,7 +147,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: 'Tap to configure account',
                   leading: _SourceDot(source: source),
                   trailing: const Icon(Icons.chevron_right_rounded, size: 20),
-                  onTap: () => context.go('/auth/${source.name}'),
+                  onTap: () => context.push('/auth/${source.name}'),
                 )),
 
             // ─── About ────────────────────────────────────────────────────────
