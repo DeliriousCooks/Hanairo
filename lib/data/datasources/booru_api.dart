@@ -19,7 +19,7 @@ abstract class BooruDataSource {
 
 class Rule34xxxDataSource implements BooruDataSource {
   final Dio _dio;
-  String? _username;
+  String? _userId;
   String? _apiKey;
 
   Rule34xxxDataSource()
@@ -49,9 +49,9 @@ class Rule34xxxDataSource implements BooruDataSource {
         'json': 1,
       };
 
-      if (_username != null && _apiKey != null) {
-        params['login'] = _username;
-        params['password_hash'] = _apiKey;
+      if (_userId != null && _apiKey != null) {
+        params['user_id'] = _userId;
+        params['api_key'] = _apiKey;
       }
 
       final response = await _dio.get('/index.php', queryParameters: params);
@@ -111,7 +111,7 @@ class Rule34xxxDataSource implements BooruDataSource {
   @override
   Future<List<String>> getTagSuggestions(String prefix) async {
     try {
-      final response = await _dio.get('/index.php', queryParameters: {
+      final params = <String, dynamic>{
         'page': 'dapi',
         's': 'tag',
         'q': 'index',
@@ -119,7 +119,12 @@ class Rule34xxxDataSource implements BooruDataSource {
         'limit': 20,
         'json': 1,
         'order': 'count',
-      });
+      };
+      if (_userId != null && _apiKey != null) {
+        params['user_id'] = _userId;
+        params['api_key'] = _apiKey;
+      }
+      final response = await _dio.get('/index.php', queryParameters: params);
 
       if (response.data == null) return [];
       final List<dynamic> data =
@@ -133,13 +138,18 @@ class Rule34xxxDataSource implements BooruDataSource {
   @override
   Future<Post?> getPost(String id) async {
     try {
-      final response = await _dio.get('/index.php', queryParameters: {
+      final params = <String, dynamic>{
         'page': 'dapi',
         's': 'post',
         'q': 'index',
         'id': id,
         'json': 1,
-      });
+      };
+      if (_userId != null && _apiKey != null) {
+        params['user_id'] = _userId;
+        params['api_key'] = _apiKey;
+      }
+      final response = await _dio.get('/index.php', queryParameters: params);
       if (response.data == null) return null;
       final List<dynamic> data =
           response.data is List ? response.data : [response.data];
@@ -152,7 +162,10 @@ class Rule34xxxDataSource implements BooruDataSource {
 
   @override
   Future<bool> login(String username, String credential) async {
-    _username = username;
+    // rule34.xxx authenticates with (user_id, api_key), not (username, password).
+    // The "username" parameter here is expected to be the numeric User ID shown
+    // on the account's API Access Credentials page.
+    _userId = username;
     _apiKey = credential;
     return true;
   }
