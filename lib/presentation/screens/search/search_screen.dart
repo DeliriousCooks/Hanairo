@@ -124,7 +124,7 @@ class _SearchScreenState extends State<SearchScreen>
                     PostGridSliver(
                       posts: state.posts,
                       onPostTapped: (post, index) {
-                        context.go('/viewer', extra: {
+                        context.push('/viewer', extra: {
                           'posts': state.posts,
                           'index': index,
                         });
