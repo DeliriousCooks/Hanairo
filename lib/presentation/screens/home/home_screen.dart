@@ -495,7 +495,7 @@ class _FavoritePreviewCard extends StatelessWidget {
     final theme = Theme.of(context);
     return GestureDetector(
       onTap: () {
-        context.go('/viewer', extra: {
+        context.push('/viewer', extra: {
           'posts': [post],
           'index': 0,
         });
