@@ -138,15 +138,24 @@ class _AuthScreenState extends State<AuthScreen> {
               _AuthInstructions(source: source),
               const SizedBox(height: 24),
 
-              Text('Username', style: theme.textTheme.labelLarge),
+              Text(
+                source == BooruSource.rule34xxx
+                    ? 'User ID'
+                    : 'Username',
+                style: theme.textTheme.labelLarge,
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: _usernameCtrl,
-                decoration: const InputDecoration(
-                  hintText: 'Your username',
-                  prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
+                decoration: InputDecoration(
+                  hintText: source == BooruSource.rule34xxx
+                      ? 'Your numeric user ID'
+                      : 'Your username',
+                  prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
                 ),
-                keyboardType: TextInputType.emailAddress,
+                keyboardType: source == BooruSource.rule34xxx
+                    ? TextInputType.number
+                    : TextInputType.emailAddress,
                 autocorrect: false,
               ),
               const SizedBox(height: 16),
@@ -294,7 +303,7 @@ class _AuthInstructions extends StatelessWidget {
   String get _instructions {
     switch (source) {
       case BooruSource.rule34xxx:
-        return 'Go to rule34.xxx → My Account → Account Options → API Access. Copy your username and API key.';
+        return 'Go to rule34.xxx → My Account → Options → API Access Credentials. Copy your User ID and API key.';
       case BooruSource.e621:
         return 'Go to e621.net → Account → Manage API Access → Generate Key. Enter your username and the generated API key.';
       case BooruSource.gelbooru:
