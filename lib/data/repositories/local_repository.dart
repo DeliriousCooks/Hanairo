@@ -134,6 +134,18 @@ class LocalRepository {
   bool isDarkMode() => getSetting<bool>('dark_mode', true);
   Future<void> setDarkMode(bool value) => setSetting('dark_mode', value);
 
+  // Accent color (stored as the AccentColor enum's name, e.g. "violet")
+  String getAccentColorName() => getSetting<String>('accent_color', 'violet');
+  Future<void> setAccentColorName(String value) => setSetting('accent_color', value);
+
+  // Liquid Glass thickness (stored as the GlassThickness enum's name)
+  String getGlassThicknessName() => getSetting<String>('glass_thickness', 'regular');
+  Future<void> setGlassThicknessName(String value) => setSetting('glass_thickness', value);
+
+  // Theme preset / wallpaper (stored as the ThemePreset enum's name)
+  String getThemePresetName() => getSetting<String>('theme_preset', 'defaultPreset');
+  Future<void> setThemePresetName(String value) => setSetting('theme_preset', value);
+
   // Rating filter
   String getRatingFilter() => getSetting<String>('rating_filter', 'explicit');
   Future<void> setRatingFilter(String value) => setSetting('rating_filter', value);

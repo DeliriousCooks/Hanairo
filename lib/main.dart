@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_controller.dart';
 import 'core/utils/logger.dart';
 import 'data/repositories/search_repository.dart';
 import 'data/repositories/local_repository.dart';
@@ -18,6 +19,7 @@ import 'domain/entities/post.dart';
 
 final _localRepo = LocalRepository();
 final _searchRepo = SearchRepository();
+late final ThemeController _themeController;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +34,7 @@ void main() async {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   await _localRepo.init();
+  _themeController = ThemeController(_localRepo);
   
   // Restore credentials
   final creds = await _localRepo.loadCredentials();
@@ -121,29 +124,47 @@ class BooruApp extends StatelessWidget {
   }
 }
 
-class _ThemeWrapper extends StatefulWidget {
-  @override
-  State<_ThemeWrapper> createState() => _ThemeWrapperState();
+/// Makes the app-wide [ThemeController] available to any descendant via
+/// `ThemeScope.of(context)`. Widgets that call this inside build() are
+/// automatically rebuilt whenever the controller's theme settings change.
+class ThemeScope extends InheritedNotifier<ThemeController> {
+  const ThemeScope({
+    super.key,
+    required ThemeController controller,
+    required super.child,
+  }) : super(notifier: controller);
+
+  static ThemeController of(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<ThemeScope>();
+    assert(scope != null, 'ThemeScope.of() called with no ThemeScope ancestor');
+    return scope!.notifier!;
+  }
 }
 
-class _ThemeWrapperState extends State<_ThemeWrapper> {
-  bool _isDark = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _isDark = _localRepo.isDarkMode();
-  }
-
+class _ThemeWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'Booru Gallery',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: _isDark ? ThemeMode.dark : ThemeMode.light,
-      routerConfig: _router,
+    return ThemeScope(
+      controller: _themeController,
+      child: AnimatedBuilder(
+        animation: _themeController,
+        builder: (context, _) {
+          return MaterialApp.router(
+            title: 'BooruWave',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.build(
+              brightness: Brightness.light,
+              accent: _themeController.accent.color,
+            ),
+            darkTheme: AppTheme.build(
+              brightness: Brightness.dark,
+              accent: _themeController.accent.color,
+            ),
+            themeMode: _themeController.isDark ? ThemeMode.dark : ThemeMode.light,
+            routerConfig: _router,
+          );
+        },
+      ),
     );
   }
 }

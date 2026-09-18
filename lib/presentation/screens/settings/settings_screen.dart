@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_settings.dart';
+import '../../../main.dart' show ThemeScope;
 import '../../../data/repositories/local_repository.dart';
 import '../../../domain/entities/post.dart';
 
@@ -13,7 +15,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late bool _darkMode;
   late bool _safeMode;
   late int _gridColumns;
   late List<String> _blacklist;
@@ -22,7 +23,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     final repo = context.read<LocalRepository>();
-    _darkMode = repo.isDarkMode();
     _safeMode = repo.isSafeMode();
     _gridColumns = repo.getGridColumns();
     _blacklist = repo.getBlacklist();
@@ -32,6 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final repo = context.read<LocalRepository>();
+    final themeController = ThemeScope.of(context);
 
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
@@ -49,11 +50,147 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'Dark Mode',
               subtitle: 'Default dark, recommended',
               trailing: Switch(
-                value: _darkMode,
-                onChanged: (v) async {
-                  await repo.setDarkMode(v);
-                  setState(() => _darkMode = v);
-                },
+                value: themeController.isDark,
+                onChanged: (v) => themeController.setDark(v),
+              ),
+            ),
+            _SettingsTile(
+              title: 'Theme Preset',
+              subtitle: themeController.preset.label,
+              trailing: null,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 4),
+                child: SizedBox(
+                  height: 40,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: ThemePreset.values.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, i) {
+                      final preset = ThemePreset.values[i];
+                      final selected = preset == themeController.preset;
+                      return GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          themeController.setPreset(preset);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            gradient: LinearGradient(colors: preset.gradientDark),
+                            border: Border.all(
+                              color: selected
+                                  ? theme.colorScheme.primary
+                                  : Colors.white.withOpacity(0.15),
+                              width: selected ? 2 : 1,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            preset.label,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            _SettingsTile(
+              title: 'Accent Color',
+              subtitle: themeController.accent.label,
+              trailing: null,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 8),
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: AccentColor.values.map((accent) {
+                    final selected = accent == themeController.accent;
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        themeController.setAccent(accent);
+                      },
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: accent.color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: selected ? theme.colorScheme.onSurface : Colors.transparent,
+                            width: 2,
+                          ),
+                          boxShadow: selected
+                              ? [
+                                  BoxShadow(
+                                    color: accent.color.withOpacity(0.5),
+                                    blurRadius: 10,
+                                    spreadRadius: 1,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: selected
+                            ? const Icon(Icons.check_rounded, color: Colors.white, size: 18)
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            _SettingsTile(
+              title: 'Liquid Glass',
+              subtitle: '${themeController.glass.label} blur intensity',
+              trailing: null,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 8),
+                child: Row(
+                  children: GlassThickness.values.map((g) {
+                    final selected = g == themeController.glass;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          themeController.setGlass(g);
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? theme.colorScheme.primaryContainer
+                                : theme.colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: selected
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.outline,
+                              width: selected ? 1.5 : 0.5,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            g.label,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: selected
+                                  ? theme.colorScheme.onPrimaryContainer
+                                  : theme.colorScheme.onSurfaceVariant,
+                              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
             ),
             _SettingsTile(
@@ -274,6 +411,7 @@ class _SettingsTile extends StatelessWidget {
   final String subtitle;
   final Widget? trailing;
   final Widget? leading;
+  final Widget? child;
   final VoidCallback? onTap;
 
   const _SettingsTile({
@@ -281,19 +419,31 @@ class _SettingsTile extends StatelessWidget {
     required this.subtitle,
     this.trailing,
     this.leading,
+    this.child,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ListTile(
+    final tile = ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
       leading: leading,
       title: Text(title, style: theme.textTheme.titleMedium),
       subtitle: Text(subtitle, style: theme.textTheme.bodyMedium),
       trailing: trailing,
       onTap: onTap,
+    );
+    if (child == null) return tile;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        tile,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: child!,
+        ),
+      ],
     );
   }
 }
