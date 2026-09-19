@@ -67,8 +67,8 @@ class SearchState extends Equatable {
   final ContentRating? ratingFilter;
   final int? minScore;
   final List<FileType>? fileTypeFilter;
-  final int currentPage;
-  final bool hasMore;
+  final Map<BooruSource, int> pageBySource;
+  final Map<BooruSource, bool> hasMoreBySource;
   final String? errorMessage;
   final List<String> tagSuggestions;
 
@@ -80,11 +80,19 @@ class SearchState extends Equatable {
     this.ratingFilter,
     this.minScore,
     this.fileTypeFilter,
-    this.currentPage = 0,
-    this.hasMore = true,
+    this.pageBySource = const {},
+    this.hasMoreBySource = const {},
     this.errorMessage,
     this.tagSuggestions = const [],
   });
+
+  /// True if at least one active source might still have more results to
+  /// paginate into. Tracking this per-source (rather than one flat flag
+  /// derived from the total merged post count) matters because sources
+  /// exhaust at different points - a source with fewer matches, or one
+  /// that's temporarily returning nothing, shouldn't stop pagination for
+  /// sources that still have plenty more.
+  bool get hasMore => hasMoreBySource.values.any((v) => v);
 
   SearchState copyWith({
     SearchStatus? status,
@@ -97,8 +105,8 @@ class SearchState extends Equatable {
     bool clearMinScore = false,
     List<FileType>? fileTypeFilter,
     bool clearFileTypeFilter = false,
-    int? currentPage,
-    bool? hasMore,
+    Map<BooruSource, int>? pageBySource,
+    Map<BooruSource, bool>? hasMoreBySource,
     String? errorMessage,
     bool clearError = false,
     List<String>? tagSuggestions,
@@ -111,13 +119,16 @@ class SearchState extends Equatable {
       ratingFilter: clearRatingFilter ? null : (ratingFilter ?? this.ratingFilter),
       minScore: clearMinScore ? null : (minScore ?? this.minScore),
       fileTypeFilter: clearFileTypeFilter ? null : (fileTypeFilter ?? this.fileTypeFilter),
-      currentPage: currentPage ?? this.currentPage,
-      hasMore: hasMore ?? this.hasMore,
+      pageBySource: pageBySource ?? this.pageBySource,
+      hasMoreBySource: hasMoreBySource ?? this.hasMoreBySource,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       tagSuggestions: tagSuggestions ?? this.tagSuggestions,
     );
   }
 
+  /// Query used for the *initial* search (page 0, across every active
+  /// source). Loading additional pages afterward is handled per-source in
+  /// the bloc, since each source paginates independently.
   SearchQuery get currentQuery => SearchQuery(
         tags: tagString.trim().isEmpty
             ? []
@@ -126,7 +137,7 @@ class SearchState extends Equatable {
         ratingFilter: ratingFilter,
         minScore: minScore,
         fileTypeFilter: fileTypeFilter,
-        page: currentPage,
+        page: 0,
         limit: 40,
       );
 
@@ -139,8 +150,8 @@ class SearchState extends Equatable {
         ratingFilter,
         minScore,
         fileTypeFilter,
-        currentPage,
-        hasMore,
+        pageBySource,
+        hasMoreBySource,
         errorMessage,
         tagSuggestions,
       ];
@@ -184,8 +195,8 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       tagString: event.tagString,
       activeSources: event.sources,
       posts: [],
-      currentPage: 0,
-      hasMore: true,
+      pageBySource: {for (final s in event.sources) s: 0},
+      hasMoreBySource: {for (final s in event.sources) s: true},
       clearError: true,
       tagSuggestions: [],
     ));
@@ -197,13 +208,20 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
 
     try {
       final query = state.currentQuery;
-      final posts = await _searchRepo.search(query);
-      final filtered = _applyBlacklist(posts);
+      final perSource = await _searchRepo.searchPerSource(query);
+      final merged = perSource.values.expand((p) => p).toList();
+      if (query.sources.length > 1) {
+        merged.sort((a, b) => b.score.compareTo(a.score));
+      }
+      final filtered = _applyBlacklist(merged);
 
       emit(state.copyWith(
         status: SearchStatus.success,
         posts: filtered,
-        hasMore: posts.length >= query.limit,
+        hasMoreBySource: {
+          for (final entry in perSource.entries)
+            entry.key: entry.value.length >= query.limit,
+        },
       ));
     } catch (e) {
       emit(state.copyWith(
@@ -219,19 +237,49 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
   ) async {
     if (state.status == SearchStatus.loadingMore || !state.hasMore) return;
 
+    // Only fetch the next page from sources that haven't run out yet -
+    // each source paginates on its own, independent page number.
+    final sourcesToLoad = state.activeSources
+        .where((s) => state.hasMoreBySource[s] ?? false)
+        .toList();
+    if (sourcesToLoad.isEmpty) return;
+
     emit(state.copyWith(status: SearchStatus.loadingMore));
 
     try {
-      final nextPage = state.currentPage + 1;
-      final query = state.currentQuery.copyWith(page: nextPage);
-      final posts = await _searchRepo.search(query);
-      final filtered = _applyBlacklist(posts);
+      final baseQuery = state.currentQuery;
+      final nextPageBySource = {
+        for (final s in sourcesToLoad) s: (state.pageBySource[s] ?? 0) + 1,
+      };
+
+      final results = await Future.wait(sourcesToLoad.map((source) async {
+        final query = baseQuery.copyWith(
+          sources: [source],
+          page: nextPageBySource[source],
+        );
+        final posts = await _searchRepo.sourceFor(source).search(query);
+        return MapEntry(source, posts);
+      }));
+
+      final newPosts = results.expand((e) => e.value).toList();
+      final filtered = _applyBlacklist(newPosts);
+
+      final updatedPageBySource = {...state.pageBySource, ...nextPageBySource};
+      final updatedHasMoreBySource = {...state.hasMoreBySource};
+      for (final entry in results) {
+        updatedHasMoreBySource[entry.key] = entry.value.length >= baseQuery.limit;
+      }
+
+      final combined = [...state.posts, ...filtered];
+      if (state.activeSources.length > 1) {
+        combined.sort((a, b) => b.score.compareTo(a.score));
+      }
 
       emit(state.copyWith(
         status: SearchStatus.success,
-        posts: [...state.posts, ...filtered],
-        currentPage: nextPage,
-        hasMore: posts.length >= query.limit,
+        posts: combined,
+        pageBySource: updatedPageBySource,
+        hasMoreBySource: updatedHasMoreBySource,
       ));
     } catch (e) {
       emit(state.copyWith(

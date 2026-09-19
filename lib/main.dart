@@ -5,7 +5,9 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
+import 'core/theme/theme_settings.dart';
 import 'core/utils/logger.dart';
+import 'presentation/widgets/common/glass_container.dart';
 import 'data/repositories/search_repository.dart';
 import 'data/repositories/local_repository.dart';
 import 'presentation/blocs/search_bloc.dart';
@@ -183,66 +185,132 @@ class MainShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      extendBodyBehindAppBar: true,
-      body: child,
-      bottomNavigationBar: _BottomNav(
-        selectedIndex: _indexForLocation(context),
-        onDestinationSelected: (index) {
-          context.go(_routes[index]);
-        },
-      ),
+    final themeController = ThemeScope.of(context);
+    return AnimatedBuilder(
+      animation: themeController,
+      builder: (context, _) {
+        return Scaffold(
+          extendBody: true,
+          extendBodyBehindAppBar: true,
+          body: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: themeController.preset.gradient(themeController.brightness),
+              ),
+            ),
+            child: child,
+          ),
+          bottomNavigationBar: _BottomNav(
+            selectedIndex: _indexForLocation(context),
+            glass: themeController.glass,
+            onDestinationSelected: (index) {
+              context.go(_routes[index]);
+            },
+          ),
+        );
+      },
     );
   }
 }
 
 class _BottomNav extends StatelessWidget {
   final int selectedIndex;
+  final GlassThickness glass;
   final ValueChanged<int> onDestinationSelected;
 
   const _BottomNav({
     required this.selectedIndex,
+    required this.glass,
     required this.onDestinationSelected,
+  });
+
+  static const _items = [
+    (icon: Icons.home_outlined, selectedIcon: Icons.home_rounded, label: 'Home'),
+    (icon: Icons.search_outlined, selectedIcon: Icons.search_rounded, label: 'Search'),
+    (icon: Icons.favorite_outline_rounded, selectedIcon: Icons.favorite_rounded, label: 'Favorites'),
+    (icon: Icons.settings_outlined, selectedIcon: Icons.settings_rounded, label: 'Settings'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: GlassContainer(
+        thickness: glass,
+        borderRadius: BorderRadius.circular(28),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            for (var i = 0; i < _items.length; i++)
+              Expanded(
+                child: _NavItem(
+                  icon: _items[i].icon,
+                  selectedIcon: _items[i].selectedIcon,
+                  label: _items[i].label,
+                  selected: i == selectedIndex,
+                  color: theme.colorScheme.primary,
+                  onTap: () => onDestinationSelected(i),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.selected,
+    required this.color,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ClipRect(
-      child: Container(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(
-              color: theme.colorScheme.outline.withOpacity(0.15),
-              width: 0.5,
-            ),
-          ),
+          color: selected ? color.withOpacity(0.9) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
         ),
-        child: NavigationBar(
-          selectedIndex: selectedIndex,
-          onDestinationSelected: onDestinationSelected,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded),
-              label: 'Home',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? selectedIcon : icon,
+              size: 22,
+              color: selected ? Colors.white : theme.colorScheme.onSurfaceVariant,
             ),
-            NavigationDestination(
-              icon: Icon(Icons.search_outlined),
-              selectedIcon: Icon(Icons.search_rounded),
-              label: 'Search',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.favorite_outline_rounded),
-              selectedIcon: Icon(Icons.favorite_rounded),
-              label: 'Favorites',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.settings_outlined),
-              selectedIcon: Icon(Icons.settings_rounded),
-              label: 'Settings',
-            ),
+            if (!selected) ...[
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ],
         ),
       ),

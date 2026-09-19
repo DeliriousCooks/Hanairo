@@ -39,7 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       slivers: [
         SliverAppBar.large(
           title: const Text('Settings'),
-          backgroundColor: theme.scaffoldBackgroundColor,
+          backgroundColor: Colors.transparent,
           pinned: true,
         ),
         SliverList(

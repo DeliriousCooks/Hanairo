@@ -174,8 +174,8 @@ class _Header extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primary, AppColors.secondary],
+                  gradient: LinearGradient(
+                    colors: [theme.colorScheme.primary, AppColors.secondary],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -189,7 +189,7 @@ class _Header extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Text(
-                'Booru Gallery',
+                'BooruWave',
                 style: theme.textTheme.headlineLarge?.copyWith(
                   color: theme.colorScheme.onSurface,
                 ),
@@ -198,7 +198,7 @@ class _Header extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Multi-source image aggregator',
+            'Your favorite booru sites, all in one place.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),

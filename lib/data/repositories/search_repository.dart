@@ -16,21 +16,32 @@ class SearchRepository {
 
   BooruDataSource sourceFor(BooruSource source) => _sources[source]!;
 
-  /// Search multiple sources concurrently and merge results
-  Future<List<Post>> search(SearchQuery query) async {
-    final futures = query.sources.map((source) async {
+  /// Search multiple sources concurrently, keeping each source's results
+  /// separate. Callers that need pagination should use this instead of
+  /// [search], since merging all sources into one flat list makes it
+  /// impossible to tell which individual sources still have more pages.
+  Future<Map<BooruSource, List<Post>>> searchPerSource(SearchQuery query) async {
+    final entries = await Future.wait(query.sources.map((source) async {
       final ds = _sources[source];
-      if (ds == null) return <Post>[];
+      if (ds == null) return MapEntry(source, <Post>[]);
       try {
-        return await ds.search(query).timeout(const Duration(seconds: 25));
+        final posts = await ds.search(query).timeout(const Duration(seconds: 25));
+        return MapEntry(source, posts);
       } catch (e) {
         AppLogger.error('Source $source timed out or failed', e);
-        return <Post>[];
+        return MapEntry(source, <Post>[]);
       }
-    });
+    }));
+    return Map.fromEntries(entries);
+  }
 
-    final results = await Future.wait(futures);
-    final merged = results.expand((r) => r).toList();
+  /// Search multiple sources concurrently and merge results into one
+  /// flat, score-sorted list. Convenient for one-shot searches, but does
+  /// not carry enough information to paginate correctly across sources -
+  /// use [searchPerSource] for that.
+  Future<List<Post>> search(SearchQuery query) async {
+    final perSource = await searchPerSource(query);
+    final merged = perSource.values.expand((r) => r).toList();
 
     // Sort by score descending when merging multiple sources
     if (query.sources.length > 1) {

@@ -50,6 +50,31 @@ class _ViewerScreenState extends State<ViewerScreen>
 
     // Immersive mode
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+    // Warm the cache for the starting image and its immediate neighbors so
+    // the very first swipe doesn't have to wait on a cold network fetch.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _precacheAround(_currentIndex);
+    });
+  }
+
+  /// Precaches the images immediately before/after [index] (and index
+  /// itself) so swiping to them is instant instead of showing a spinner
+  /// while a fresh network fetch + decode happens. This is the standard
+  /// fix for "swiping feels laggy" in PageView-based image galleries -
+  /// without it, every single swipe pays the full network+decode cost.
+  void _precacheAround(int index) {
+    for (final i in [index, index - 1, index + 1]) {
+      if (i < 0 || i >= widget.posts.length) continue;
+      final post = widget.posts[i];
+      if (post.isVideo) continue; // videos aren't precached as images
+      final url = post.displayUrl ?? post.thumbnailUrl;
+      if (url == null || url.isEmpty) continue;
+      precacheImage(CachedNetworkImageProvider(url), context).catchError((_) {
+        // Best-effort only; a failed precache just falls back to the
+        // normal in-place loading spinner for that page.
+      });
+    }
   }
 
   @override
@@ -92,6 +117,7 @@ class _ViewerScreenState extends State<ViewerScreen>
                   _currentIndex = index;
                   _showDetails = false;
                 });
+                _precacheAround(index);
               },
             ),
           ),

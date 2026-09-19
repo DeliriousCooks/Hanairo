@@ -36,7 +36,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       slivers: [
         SliverAppBar.large(
           title: const Text('Favorites'),
-          backgroundColor: theme.scaffoldBackgroundColor,
+          backgroundColor: Colors.transparent,
           pinned: true,
           actions: [
             if (_favorites.isNotEmpty)
