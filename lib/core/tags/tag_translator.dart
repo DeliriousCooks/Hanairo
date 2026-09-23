@@ -80,9 +80,11 @@ class TagTranslator {
     switch (source) {
       case BooruSource.rule34xxx:
       case BooruSource.gelbooru:
+      case BooruSource.xbooru:
         return '+';
       case BooruSource.e621:
       case BooruSource.paheal:
+      case BooruSource.danbooru:
         return ' ';
     }
   }
