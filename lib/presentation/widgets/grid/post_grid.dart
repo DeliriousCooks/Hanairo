@@ -20,30 +20,27 @@ class PostGridSliver extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       sliver: SliverGrid(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: columns,
-          crossAxisSpacing: 4,
-          mainAxisSpacing: 4,
+          crossAxisSpacing: 6,
+          mainAxisSpacing: 6,
           childAspectRatio: 0.75,
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) {
             final post = posts[index];
             return PostTile(
-              // Stable key (not just index) so Flutter correctly preserves
-              // each tile's element/render state across rebuilds instead
-              // of potentially reassociating it with a different post if
-              // the list ever reorders (dedup, blacklist filtering, a
-              // fresh list instance from pagination) - this is part of
-              // what caused visible jumping/flicker when new pages loaded.
+              // Stable key prevents layout jumps when list rebuilds
               key: ValueKey('${post.source.name}_${post.id}'),
               post: post,
               onTap: () => onPostTapped(post, index),
             );
           },
           childCount: posts.length,
+          // Disable addRepaintBoundaries to avoid unnecessary layer allocation
+          addRepaintBoundaries: false,
         ),
       ),
     );
@@ -68,16 +65,15 @@ class _PostTileState extends State<PostTile>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _scaleAnim;
-  bool _isPressed = false;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 120),
+      duration: const Duration(milliseconds: 100),
     );
-    _scaleAnim = Tween<double>(begin: 1.0, end: 0.94).animate(
+    _scaleAnim = Tween<double>(begin: 1.0, end: 0.93).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
   }
@@ -111,14 +107,17 @@ class _PostTileState extends State<PostTile>
           child: child,
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // ─── Thumbnail ─────────────────────────────────────────────
+              // ─── Background color while loading ─────────────────────────
+              Container(color: theme.colorScheme.surfaceContainerHighest),
+
+              // ─── Thumbnail ───────────────────────────────────────────────
               _ThumbnailImage(post: post, ext: ext),
 
-              // ─── Overlay badges ────────────────────────────────────────
+              // ─── Bottom gradient + badges ────────────────────────────────
               Positioned(
                 bottom: 0,
                 left: 0,
@@ -126,7 +125,7 @@ class _PostTileState extends State<PostTile>
                 child: _PostOverlay(post: post),
               ),
 
-              // ─── Media type badge ──────────────────────────────────────
+              // ─── Media type badge ────────────────────────────────────────
               if (post.isVideo || post.isGif)
                 Positioned(
                   top: 6,
@@ -134,7 +133,7 @@ class _PostTileState extends State<PostTile>
                   child: _MediaTypeBadge(post: post),
                 ),
 
-              // ─── Source badge ──────────────────────────────────────────
+              // ─── Source badge ────────────────────────────────────────────
               Positioned(
                 top: 6,
                 left: 6,
@@ -157,13 +156,17 @@ class _ThumbnailImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final url = post.thumbnailUrl ?? post.previewUrl ?? post.fileUrl;
+    final url = post.thumbnailUrl ?? post.previewUrl ?? post.sampleUrl ?? post.fileUrl;
 
-    if (url == null) {
+    if (url == null || url.isEmpty) {
       return Container(
         color: theme.colorScheme.surfaceContainerHighest,
-        child: const Center(
-          child: Icon(Icons.image_not_supported_outlined, size: 24),
+        child: Center(
+          child: Icon(
+            Icons.image_not_supported_outlined,
+            size: 24,
+            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
+          ),
         ),
       );
     }
@@ -171,6 +174,8 @@ class _ThumbnailImage extends StatelessWidget {
     return CachedNetworkImage(
       imageUrl: url,
       fit: BoxFit.cover,
+      // Use memCacheWidth to limit decoded size and speed up display
+      memCacheWidth: 400,
       placeholder: (context, url) => Shimmer.fromColors(
         baseColor: ext?.shimmerBase ?? AppColors.darkCard,
         highlightColor: ext?.shimmerHighlight ?? AppColors.darkCardElevated,
@@ -196,13 +201,12 @@ class _PostOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
-          colors: [Color(0xCC000000), Colors.transparent],
+          colors: [Color(0xB3000000), Colors.transparent],
           stops: [0.0, 1.0],
         ),
       ),
@@ -220,7 +224,7 @@ class _PostOverlay extends StatelessWidget {
             ),
             const SizedBox(width: 2),
             Text(
-              post.score.abs().toString(),
+              _formatScore(post.score.abs()),
               style: const TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
@@ -228,12 +232,18 @@ class _PostOverlay extends StatelessWidget {
               ),
             ),
             const Spacer(),
-          ],
-          // Rating indicator
+          ] else
+            const Spacer(),
+          // Rating dot
           _RatingDot(rating: post.rating),
         ],
       ),
     );
+  }
+
+  String _formatScore(int score) {
+    if (score >= 1000) return '${(score / 1000).toStringAsFixed(1)}k';
+    return score.toString();
   }
 }
 
@@ -263,7 +273,7 @@ class _RatingDot extends StatelessWidget {
         color: _color,
         shape: BoxShape.circle,
         boxShadow: [
-          BoxShadow(color: _color.withOpacity(0.5), blurRadius: 4),
+          BoxShadow(color: _color.withOpacity(0.6), blurRadius: 4),
         ],
       ),
     );
@@ -277,24 +287,24 @@ class _MediaTypeBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(6),
+        color: Colors.black.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             post.isVideo ? Icons.play_circle_filled : Icons.gif_box_outlined,
-            size: 12,
+            size: 10,
             color: Colors.white,
           ),
-          const SizedBox(width: 3),
+          const SizedBox(width: 2),
           Text(
-            post.isVideo ? 'VIDEO' : 'GIF',
+            post.isVideo ? 'VID' : 'GIF',
             style: const TextStyle(
-              fontSize: 9,
+              fontSize: 8,
               fontWeight: FontWeight.w700,
               color: Colors.white,
               letterSpacing: 0.5,
@@ -320,6 +330,8 @@ class _SourceBadge extends StatelessWidget {
         return const Color(0xFFFF7CA0);
       case BooruSource.paheal:
         return const Color(0xFFFFCC7C);
+      case BooruSource.danbooru:
+        return const Color(0xFFFF9D4F);
       default:
         return const Color(0xFF7C8FFF);
     }
@@ -330,7 +342,7 @@ class _SourceBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
-        color: _color.withOpacity(0.85),
+        color: _color.withOpacity(0.9),
         borderRadius: BorderRadius.circular(5),
       ),
       child: Text(

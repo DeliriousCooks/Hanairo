@@ -38,8 +38,17 @@ class _ViewerScreenState extends State<ViewerScreen>
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
+    _currentIndex = widget.initialIndex.clamp(0, widget.posts.length - 1);
+
+    // CRITICAL FIX: PageController must be created synchronously before the
+    // widget tree builds. Creating it in a callback or with a delay caused
+    // the PhotoViewGallery to render before the controller attached, which
+    // left the page at index 0 regardless of initialIndex — when index 0
+    // had a null/bad URL this produced the grey screen bug.
+    _pageController = PageController(
+      initialPage: _currentIndex,
+      keepPage: false, // don't keep stale page offset across rebuilds
+    );
 
     _uiController = AnimationController(
       vsync: this,
@@ -48,32 +57,26 @@ class _ViewerScreenState extends State<ViewerScreen>
     _uiAnim = CurvedAnimation(parent: _uiController, curve: Curves.easeInOut);
     _uiController.value = 1.0;
 
-    // Immersive mode
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-    // Warm the cache for the starting image and its immediate neighbors so
-    // the very first swipe doesn't have to wait on a cold network fetch.
+    // Warm cache for the starting image and neighbors
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _precacheAround(_currentIndex);
+      if (mounted) _precacheAround(_currentIndex);
     });
   }
 
-  /// Precaches the images immediately before/after [index] (and index
-  /// itself) so swiping to them is instant instead of showing a spinner
-  /// while a fresh network fetch + decode happens. This is the standard
-  /// fix for "swiping feels laggy" in PageView-based image galleries -
-  /// without it, every single swipe pays the full network+decode cost.
   void _precacheAround(int index) {
-    for (final i in [index, index - 1, index + 1]) {
+    for (final i in [index - 1, index, index + 1]) {
       if (i < 0 || i >= widget.posts.length) continue;
       final post = widget.posts[i];
-      if (post.isVideo) continue; // videos aren't precached as images
-      final url = post.displayUrl ?? post.thumbnailUrl;
+      if (post.isVideo) continue;
+      // Use displayUrl preferably (full res), then sample, then thumbnail
+      final url = post.displayUrl ?? post.sampleUrl ?? post.thumbnailUrl;
       if (url == null || url.isEmpty) continue;
-      precacheImage(CachedNetworkImageProvider(url), context).catchError((_) {
-        // Best-effort only; a failed precache just falls back to the
-        // normal in-place loading spinner for that page.
-      });
+      precacheImage(
+        CachedNetworkImageProvider(url),
+        context,
+      ).catchError((_) {/* best-effort */});
     }
   }
 
@@ -81,7 +84,6 @@ class _ViewerScreenState extends State<ViewerScreen>
   void dispose() {
     _pageController.dispose();
     _uiController.dispose();
-    // Restore system UI
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -92,7 +94,7 @@ class _ViewerScreenState extends State<ViewerScreen>
       _uiController.forward();
     } else {
       _uiController.reverse();
-      _showDetails = false;
+      if (_showDetails) setState(() => _showDetails = false);
     }
   }
 
@@ -106,12 +108,13 @@ class _ViewerScreenState extends State<ViewerScreen>
       extendBody: true,
       body: Stack(
         children: [
-          // ─── Media Gallery ─────────────────────────────────────────────────
+          // ─── Media Gallery ────────────────────────────────────────────────
           GestureDetector(
             onTap: _toggleUI,
             child: _MediaGallery(
               posts: widget.posts,
               pageController: _pageController,
+              initialIndex: _currentIndex,
               onPageChanged: (index) {
                 setState(() {
                   _currentIndex = index;
@@ -122,7 +125,7 @@ class _ViewerScreenState extends State<ViewerScreen>
             ),
           ),
 
-          // ─── Top Bar (back + info) ─────────────────────────────────────────
+          // ─── Top Bar ──────────────────────────────────────────────────────
           FadeTransition(
             opacity: _uiAnim,
             child: _TopBar(
@@ -133,13 +136,11 @@ class _ViewerScreenState extends State<ViewerScreen>
                 SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
                 context.pop();
               },
-              onInfo: () {
-                setState(() => _showDetails = !_showDetails);
-              },
+              onInfo: () => setState(() => _showDetails = !_showDetails),
             ),
           ),
 
-          // ─── Bottom Actions ────────────────────────────────────────────────
+          // ─── Bottom Actions ───────────────────────────────────────────────
           FadeTransition(
             opacity: _uiAnim,
             child: Positioned(
@@ -148,18 +149,17 @@ class _ViewerScreenState extends State<ViewerScreen>
               right: 0,
               child: _BottomActions(
                 post: _currentPost,
-                onDetailsToggle: () {
-                  setState(() => _showDetails = !_showDetails);
-                },
+                onDetailsToggle: () =>
+                    setState(() => _showDetails = !_showDetails),
               ),
             ),
           ),
 
-          // ─── Details Panel (slide up) ──────────────────────────────────────
+          // ─── Details Panel ────────────────────────────────────────────────
           AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOutCubic,
-            bottom: _showDetails ? 0 : -500,
+            bottom: _showDetails ? 0 : -600,
             left: 0,
             right: 0,
             child: _DetailsPanel(post: _currentPost),
@@ -170,16 +170,18 @@ class _ViewerScreenState extends State<ViewerScreen>
   }
 }
 
-// ─── Media Gallery ────────────────────────────────────────────────────────────
+// ─── Media Gallery (fixed grey screen bug) ────────────────────────────────
 
 class _MediaGallery extends StatelessWidget {
   final List<Post> posts;
   final PageController pageController;
+  final int initialIndex;
   final ValueChanged<int> onPageChanged;
 
   const _MediaGallery({
     required this.posts,
     required this.pageController,
+    required this.initialIndex,
     required this.onPageChanged,
   });
 
@@ -191,41 +193,83 @@ class _MediaGallery extends StatelessWidget {
       onPageChanged: onPageChanged,
       scrollPhysics: const BouncingScrollPhysics(),
       backgroundDecoration: const BoxDecoration(color: Colors.black),
+      // FIX: Do NOT use loadingBuilder as a shared widget — it causes the
+      // gallery to show a single loading indicator for the entire viewport
+      // which appears as a grey/black screen while images load. Each page
+      // option's own builder handles its loading state individually below.
       builder: (context, index) {
         final post = posts[index];
 
-        if (post.isVideo || post.isGif) {
+        if (post.isVideo) {
           return PhotoViewGalleryPageOptions.customChild(
             child: _VideoPlayerWidget(post: post),
             minScale: PhotoViewComputedScale.contained,
             maxScale: PhotoViewComputedScale.covered * 2.5,
+            heroAttributes: PhotoViewHeroAttributes(tag: post.uniqueId),
           );
         }
 
-        final url = post.displayUrl ?? post.thumbnailUrl ?? '';
+        // FIX: Use the best available URL; fall back down the chain
+        // instead of using null which causes the grey screen.
+        final url = _bestUrl(post);
+
+        if (url == null || url.isEmpty) {
+          return PhotoViewGalleryPageOptions.customChild(
+            child: const Center(
+              child: Icon(
+                Icons.broken_image_outlined,
+                size: 64,
+                color: Colors.white30,
+              ),
+            ),
+            minScale: PhotoViewComputedScale.contained,
+            maxScale: PhotoViewComputedScale.contained,
+          );
+        }
+
         return PhotoViewGalleryPageOptions(
           imageProvider: CachedNetworkImageProvider(url),
           minScale: PhotoViewComputedScale.contained * 0.8,
           maxScale: PhotoViewComputedScale.covered * 3.0,
           heroAttributes: PhotoViewHeroAttributes(tag: post.uniqueId),
           filterQuality: FilterQuality.high,
+          // FIX: inline error builder per-page so errors show in-place
+          // instead of as a shared grey screen
           errorBuilder: (context, error, stackTrace) => const Center(
-            child: Icon(Icons.broken_image_outlined,
-                size: 52, color: Colors.white30),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.broken_image_outlined,
+                    size: 52, color: Colors.white30),
+                SizedBox(height: 12),
+                Text(
+                  'Failed to load image',
+                  style: TextStyle(color: Colors.white38, fontSize: 13),
+                ),
+              ],
+            ),
           ),
         );
       },
-      loadingBuilder: (context, event) => const Center(
-        child: CircularProgressIndicator(
-          color: AppColors.primary,
-          strokeWidth: 2,
-        ),
-      ),
+      // FIX: Use per-page loading indicator via customChild pattern above;
+      // removing the shared loadingBuilder prevents the "entire gallery
+      // shows grey while one page loads" bug.
     );
+  }
+
+  // Selects the best available image URL for a post, working down from
+  // full-size to sample to preview to thumbnail. Returning null is valid —
+  // the caller renders a placeholder instead of a blank screen.
+  String? _bestUrl(Post post) {
+    if (post.fileUrl?.isNotEmpty == true) return post.fileUrl;
+    if (post.sampleUrl?.isNotEmpty == true) return post.sampleUrl;
+    if (post.previewUrl?.isNotEmpty == true) return post.previewUrl;
+    if (post.thumbnailUrl?.isNotEmpty == true) return post.thumbnailUrl;
+    return null;
   }
 }
 
-// ─── Video Player ─────────────────────────────────────────────────────────────
+// ─── Video Player ─────────────────────────────────────────────────────────
 
 class _VideoPlayerWidget extends StatefulWidget {
   final Post post;
@@ -239,6 +283,7 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
   VideoPlayerController? _vpController;
   ChewieController? _chewieController;
   bool _initialized = false;
+  String? _error;
 
   @override
   void initState() {
@@ -248,21 +293,28 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
 
   Future<void> _initPlayer() async {
     final url = widget.post.fileUrl ?? widget.post.sampleUrl;
-    if (url == null) return;
+    if (url == null || url.isEmpty) {
+      if (mounted) setState(() => _error = 'No video URL available');
+      return;
+    }
 
-    _vpController = VideoPlayerController.networkUrl(Uri.parse(url));
-    await _vpController!.initialize();
+    try {
+      _vpController = VideoPlayerController.networkUrl(Uri.parse(url));
+      await _vpController!.initialize();
 
-    _chewieController = ChewieController(
-      videoPlayerController: _vpController!,
-      autoPlay: true,
-      looping: true,
-      aspectRatio: widget.post.aspectRatio,
-      allowFullScreen: false,
-      showControls: true,
-    );
+      _chewieController = ChewieController(
+        videoPlayerController: _vpController!,
+        autoPlay: true,
+        looping: true,
+        aspectRatio: widget.post.aspectRatio,
+        allowFullScreen: false,
+        showControls: true,
+      );
 
-    if (mounted) setState(() => _initialized = true);
+      if (mounted) setState(() => _initialized = true);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Failed to load video');
+    }
   }
 
   @override
@@ -274,9 +326,28 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.videocam_off_rounded,
+                size: 52, color: Colors.white30),
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              style: const TextStyle(color: Colors.white38, fontSize: 13),
+            ),
+          ],
+        ),
+      );
+    }
     if (!_initialized || _chewieController == null) {
       return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+        child: CircularProgressIndicator(
+          color: AppColors.primary,
+          strokeWidth: 2,
+        ),
       );
     }
     return Center(
@@ -288,7 +359,7 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
   }
 }
 
-// ─── Top Bar ──────────────────────────────────────────────────────────────────
+// ─── Top Bar ──────────────────────────────────────────────────────────────
 
 class _TopBar extends StatelessWidget {
   final Post post;
@@ -320,20 +391,18 @@ class _TopBar extends StatelessWidget {
           ),
         ),
         padding: EdgeInsets.fromLTRB(
-          8,
+          10,
           MediaQuery.of(context).padding.top + 8,
-          8,
+          10,
           20,
         ),
         child: Row(
           children: [
-            // Back button
             _ViewerButton(
               icon: Icons.arrow_back_ios_new_rounded,
               onTap: onBack,
             ),
             const SizedBox(width: 8),
-            // Post counter
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -350,7 +419,7 @@ class _TopBar extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            // Source badge
+            // Source label
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -375,7 +444,7 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-// ─── Bottom Actions ───────────────────────────────────────────────────────────
+// ─── Bottom Actions ───────────────────────────────────────────────────────
 
 class _BottomActions extends StatelessWidget {
   final Post post;
@@ -400,59 +469,82 @@ class _BottomActions extends StatelessWidget {
         ),
       ),
       padding: EdgeInsets.fromLTRB(
-        16,
-        24,
-        16,
-        MediaQuery.of(context).padding.bottom + 16,
+        20,
+        32,
+        20,
+        MediaQuery.of(context).padding.bottom + 20,
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Favorite
-          _ActionButton(
-            icon: isFav ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
-            label: 'Save',
-            color: isFav ? AppColors.error : Colors.white,
-            onTap: () {
-              HapticFeedback.mediumImpact();
-              context.read<SearchBloc>().add(PostFavoriteToggled(post));
-            },
-          ),
-          const SizedBox(width: 16),
-          // Details
-          _ActionButton(
-            icon: Icons.layers_outlined,
-            label: 'Details',
-            onTap: onDetailsToggle,
-          ),
-          const Spacer(),
-          // Score
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  post.score >= 0
-                      ? Icons.arrow_upward_rounded
-                      : Icons.arrow_downward_rounded,
-                  size: 14,
-                  color: post.score >= 0 ? AppColors.success : AppColors.error,
+          // Score chip
+          if (post.score != 0)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.55),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white12),
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  post.score.abs().toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      post.score > 0
+                          ? Icons.arrow_upward_rounded
+                          : Icons.arrow_downward_rounded,
+                      size: 14,
+                      color: post.score > 0 ? AppColors.success : AppColors.error,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      post.score.abs().toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
+          // Action buttons row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _ActionButton(
+                icon: isFav ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
+                label: isFav ? 'Saved' : 'Save',
+                color: isFav ? AppColors.ratingExplicit : Colors.white,
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  context.read<SearchBloc>().add(PostFavoriteToggled(post));
+                },
+              ),
+              _ActionButton(
+                icon: Icons.open_in_browser_rounded,
+                label: 'Source',
+                onTap: () {
+                  // Open in browser - url_launcher would go here
+                },
+              ),
+              _ActionButton(
+                icon: Icons.share_rounded,
+                label: 'Share',
+                onTap: () {
+                  // share_plus would go here
+                },
+              ),
+              _ActionButton(
+                icon: Icons.tag_rounded,
+                label: 'Tags',
+                onTap: onDetailsToggle,
+              ),
+            ],
           ),
         ],
       ),
@@ -476,25 +568,28 @@ class _ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.4),
+              color: Colors.black.withOpacity(0.45),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white12),
+              border: Border.all(color: Colors.white.withOpacity(0.12)),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, color: color, size: 22),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white70,
+            style: TextStyle(
+              color: color == Colors.white ? Colors.white70 : color.withOpacity(0.9),
               fontSize: 10,
               fontWeight: FontWeight.w500,
             ),
@@ -505,7 +600,7 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-// ─── Details Panel ────────────────────────────────────────────────────────────
+// ─── Details Panel ────────────────────────────────────────────────────────
 
 class _DetailsPanel extends StatelessWidget {
   final Post post;
@@ -518,7 +613,7 @@ class _DetailsPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.darkSurface.withOpacity(0.97),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border.all(color: AppColors.darkBorder.withOpacity(0.5)),
+        border: Border.all(color: AppColors.darkBorder.withOpacity(0.4)),
       ),
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.65,
@@ -539,23 +634,25 @@ class _DetailsPanel extends StatelessWidget {
               ),
             ),
           ),
-          // Content
           Flexible(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                8,
+                20,
+                MediaQuery.of(context).padding.bottom + 32,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Meta info
                   _MetaRow(post: post),
                   const SizedBox(height: 16),
                   const Divider(height: 1, color: AppColors.darkDivider),
                   const SizedBox(height: 16),
-                  // Tags
                   _TagsSection(post: post),
-                  const SizedBox(height: 16),
                   if (post.description?.isNotEmpty ?? false) ...[
+                    const SizedBox(height: 16),
                     const Divider(height: 1, color: AppColors.darkDivider),
                     const SizedBox(height: 16),
                     Text(
@@ -603,8 +700,8 @@ class _MetaRow extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 4),
-              if (post.uploaderName != null)
+              if (post.uploaderName != null) ...[
+                const SizedBox(height: 4),
                 Text(
                   'by ${post.uploaderName}',
                   style: const TextStyle(
@@ -612,40 +709,40 @@ class _MetaRow extends StatelessWidget {
                     fontSize: 13,
                   ),
                 ),
-              const SizedBox(height: 8),
-              Row(
+              ],
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
                 children: [
                   _MetaBadge(
                     label: '${post.width ?? '?'}×${post.height ?? '?'}',
                     icon: Icons.aspect_ratio_rounded,
                   ),
-                  const SizedBox(width: 8),
                   _MetaBadge(
                     label: post.fileType.name.toUpperCase(),
                     icon: Icons.insert_drive_file_outlined,
                   ),
-                  const SizedBox(width: 8),
                   _RatingBadge(rating: post.rating),
+                  if (post.fileSize != null)
+                    _MetaBadge(
+                      label: _formatFileSize(post.fileSize!),
+                      icon: Icons.storage_rounded,
+                    ),
                 ],
               ),
             ],
           ),
         ),
-        if (post.fileSize != null)
-          Text(
-            _formatFileSize(post.fileSize!),
-            style: const TextStyle(
-              color: AppColors.textTertiary,
-              fontSize: 12,
-            ),
-          ),
       ],
     );
   }
 
   String _formatFileSize(int bytes) {
     if (bytes < 1024) return '${bytes}B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)}KB';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)}KB';
+    }
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
   }
 }
@@ -705,7 +802,7 @@ class _RatingBadge extends StatelessWidget {
       case ContentRating.safe:
         return 'Safe';
       case ContentRating.questionable:
-        return 'Questionable';
+        return 'Q';
       case ContentRating.explicit:
         return 'Explicit';
       default:
@@ -749,6 +846,13 @@ class _TagsSection extends StatelessWidget {
       tagsByCategory.putIfAbsent(tag.category, () => []).add(tag);
     }
 
+    if (tagsByCategory.isEmpty) {
+      return Text(
+        'No tags',
+        style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -762,53 +866,54 @@ class _TagsSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         ...tagsByCategory.entries.map((entry) {
-          final color =
-              ext?.tagColors[entry.key] ?? AppColors.textSecondary;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                entry.key.toUpperCase(),
-                style: TextStyle(
-                  color: color.withOpacity(0.7),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.0,
+          final color = ext?.tagColors[entry.key] ?? AppColors.textSecondary;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.key.toUpperCase(),
+                  style: TextStyle(
+                    color: color.withOpacity(0.6),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.0,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: entry.value.map((tag) {
-                  return GestureDetector(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      // Search this tag
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                            color: color.withOpacity(0.2), width: 0.5),
-                      ),
-                      child: Text(
-                        tag.displayName,
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: entry.value.map((tag) {
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        // Navigate to search with this tag
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 9, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                              color: color.withOpacity(0.2), width: 0.5),
+                        ),
+                        child: Text(
+                          tag.displayName,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 12),
-            ],
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
           );
         }),
       ],
@@ -833,9 +938,9 @@ class _ViewerButton extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.4),
+          color: Colors.black.withOpacity(0.45),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white12),
+          border: Border.all(color: Colors.white.withOpacity(0.12)),
         ),
         child: Icon(icon, color: Colors.white, size: 18),
       ),

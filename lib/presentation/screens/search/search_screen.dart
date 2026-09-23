@@ -7,9 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../domain/entities/post.dart';
 import '../../blocs/search_bloc.dart';
 import '../../widgets/grid/post_grid.dart';
-import '../../widgets/search/search_bar_widget.dart';
 import '../../widgets/search/filter_sheet.dart';
-import '../../widgets/common/source_badge.dart';
 import '../../widgets/common/page_background.dart';
 import '../../../data/repositories/local_repository.dart';
 
@@ -23,8 +21,13 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen>
     with AutomaticKeepAliveClientMixin {
-  late final TextEditingController _searchController;
   final _scrollController = ScrollController();
+  // Tag chips: list of individual tags the user has added
+  final List<String> _tagChips = [];
+  // Text currently typed in the input (the "next" tag being composed)
+  String _inputText = '';
+  final _inputController = TextEditingController();
+  final _inputFocus = FocusNode();
   bool _showSuggestions = false;
 
   @override
@@ -33,26 +36,44 @@ class _SearchScreenState extends State<SearchScreen>
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController(text: widget.initialQuery);
     _scrollController.addListener(_onScroll);
 
     if (widget.initialQuery.isNotEmpty) {
+      // Parse initial query into chips
+      final parts = widget.initialQuery.trim().split(RegExp(r'\s+'));
+      _tagChips.addAll(parts.where((p) => p.isNotEmpty));
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _submitSearch(widget.initialQuery);
+        _submitSearch();
       });
     }
+
+    _inputController.addListener(() {
+      final text = _inputController.text;
+      if (_inputText != text) {
+        setState(() => _inputText = text);
+        if (text.isNotEmpty && !text.endsWith(' ')) {
+          context.read<SearchBloc>().add(SearchQueryChanged(text));
+          setState(() => _showSuggestions = true);
+        } else {
+          context.read<SearchBloc>().add(SearchQueryChanged(''));
+          setState(() => _showSuggestions = false);
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
     _scrollController.dispose();
+    _inputController.dispose();
+    _inputFocus.dispose();
     super.dispose();
   }
 
   void _onScroll() {
     if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 400) {
+        _scrollController.position.maxScrollExtent - 500) {
       final state = context.read<SearchBloc>().state;
       if (state.status == SearchStatus.success && state.hasMore) {
         context.read<SearchBloc>().add(SearchLoadMore());
@@ -60,7 +81,36 @@ class _SearchScreenState extends State<SearchScreen>
     }
   }
 
-  void _submitSearch(String query) {
+  void _addTag(String tag) {
+    final cleaned = tag.trim().replaceAll(' ', '_');
+    if (cleaned.isEmpty) return;
+    if (!_tagChips.contains(cleaned)) {
+      setState(() => _tagChips.add(cleaned));
+    }
+    _inputController.clear();
+    setState(() {
+      _inputText = '';
+      _showSuggestions = false;
+    });
+    context.read<SearchBloc>().add(SearchQueryChanged(''));
+    // Auto-search when a tag is confirmed
+    _submitSearch();
+  }
+
+  void _removeTag(String tag) {
+    setState(() => _tagChips.remove(tag));
+    _submitSearch();
+  }
+
+  void _submitSearch() {
+    // Combine chips + any partial input text
+    final allTags = [..._tagChips];
+    final partial = _inputController.text.trim();
+    if (partial.isNotEmpty) {
+      allTags.add(partial.replaceAll(' ', '_'));
+    }
+    final query = allTags.join(' ');
+
     setState(() => _showSuggestions = false);
     FocusScope.of(context).unfocus();
     HapticFeedback.lightImpact();
@@ -68,118 +118,129 @@ class _SearchScreenState extends State<SearchScreen>
     bloc.add(SearchSubmitted(query, bloc.state.activeSources));
   }
 
+  String get _fullQueryString {
+    final all = [..._tagChips];
+    if (_inputText.trim().isNotEmpty) all.add(_inputText.trim());
+    return all.join(' ');
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final theme = Theme.of(context);
+    final topPad = MediaQuery.of(context).padding.top;
 
     return PageBackground(
       child: Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // ─── Main Content ──────────────────────────────────────────────────
-          BlocBuilder<SearchBloc, SearchState>(
-            builder: (context, state) {
-              return CustomScrollView(
-                controller: _scrollController,
-                physics: const BouncingScrollPhysics(),
-                slivers: [
-                  // Header space for search bar
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: MediaQuery.of(context).padding.top + 72,
-                    ),
-                  ),
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          children: [
+            // ─── Main scrollable content ──────────────────────────────────
+            BlocBuilder<SearchBloc, SearchState>(
+              builder: (context, state) {
+                // Dynamic header height based on chip count
+                final chipsRows = (_tagChips.length / 3).ceil();
+                final headerHeight = topPad +
+                    56 + // search bar height
+                    (chipsRows > 0 ? (chipsRows * 32 + 8).toDouble() : 0) +
+                    8;
 
-                  // Source chips
-                  SliverToBoxAdapter(
-                    child: _SourceFilter(state: state),
-                  ),
-
-                  // Results count / status
-                  if (state.status == SearchStatus.success ||
-                      state.status == SearchStatus.loadingMore)
+                return CustomScrollView(
+                  controller: _scrollController,
+                  physics: const BouncingScrollPhysics(),
+                  // Key so grid doesn't rebuild on every state change that
+                  // isn't changing the post list
+                  slivers: [
+                    // Space for the floating search header
                     SliverToBoxAdapter(
-                      child: _ResultsHeader(state: state),
+                      child: SizedBox(height: headerHeight + 4),
                     ),
 
-                  // Grid or placeholder
-                  if (state.status == SearchStatus.initial)
-                    const SliverFillRemaining(
-                      child: _EmptyState(),
-                    )
-                  else if (state.status == SearchStatus.loading)
-                    const SliverToBoxAdapter(child: _LoadingGrid())
-                  else if (state.status == SearchStatus.failure)
-                    SliverFillRemaining(
-                      child: _ErrorState(
-                        message: state.errorMessage ?? 'Something went wrong',
-                        onRetry: () => context
-                            .read<SearchBloc>()
-                            .add(SearchRefreshed()),
-                      ),
-                    )
-                  else if (state.posts.isEmpty &&
-                      state.status == SearchStatus.success)
-                    const SliverFillRemaining(child: _NoResultsState())
-                  else ...[
-                    PostGridSliver(
-                      posts: state.posts,
-                      columns: context.read<LocalRepository>().getGridColumns(),
-                      onPostTapped: (post, index) {
-                        context.push('/viewer', extra: {
-                          'posts': state.posts,
-                          'index': index,
-                        });
-                      },
+                    // Source filter chips
+                    SliverToBoxAdapter(
+                      child: _SourceChips(state: state),
                     ),
-                    if (state.status == SearchStatus.loadingMore)
-                      const SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Center(
-                            child: SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+
+                    // Results header with real count
+                    if (state.status == SearchStatus.success ||
+                        state.status == SearchStatus.loadingMore)
+                      SliverToBoxAdapter(
+                        child: _ResultsHeader(state: state),
+                      ),
+
+                    // Content
+                    if (state.status == SearchStatus.initial)
+                      const SliverFillRemaining(child: _EmptyState())
+                    else if (state.status == SearchStatus.loading)
+                      const SliverToBoxAdapter(child: _LoadingGrid())
+                    else if (state.status == SearchStatus.failure)
+                      SliverFillRemaining(
+                        child: _ErrorState(
+                          message: state.errorMessage ?? 'Something went wrong',
+                          onRetry: () => context
+                              .read<SearchBloc>()
+                              .add(SearchRefreshed()),
+                        ),
+                      )
+                    else if (state.posts.isEmpty &&
+                        state.status == SearchStatus.success)
+                      const SliverFillRemaining(child: _NoResultsState())
+                    else ...[
+                      PostGridSliver(
+                        // Stable key: only rebuild when posts list actually
+                        // changes identity (prevents grid reflow on
+                        // unrelated state updates like loadingMore status)
+                        key: ValueKey(state.posts.length),
+                        posts: state.posts,
+                        columns:
+                            context.read<LocalRepository>().getGridColumns(),
+                        onPostTapped: (post, index) {
+                          context.push('/viewer', extra: {
+                            'posts': state.posts,
+                            'index': index,
+                          });
+                        },
+                      ),
+                      if (state.status == SearchStatus.loadingMore)
+                        const SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: Center(
+                              child: SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                    ],
+
+                    const SliverToBoxAdapter(child: SizedBox(height: 100)),
                   ],
+                );
+              },
+            ),
 
-                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
-                ],
-              );
-            },
-          ),
-
-          // ─── Floating Search Bar ───────────────────────────────────────────
-          _FloatingSearchBar(
-            controller: _searchController,
-            onChanged: (q) {
-              context.read<SearchBloc>().add(SearchQueryChanged(q));
-              setState(() => _showSuggestions = q.isNotEmpty);
-            },
-            onSubmitted: _submitSearch,
-            onFilterTapped: () => _showFilterSheet(context),
-            showSuggestions: _showSuggestions,
-            onSuggestionSelected: (tag) {
-              final current = _searchController.text.trim();
-              final parts = current.split(' ');
-              if (parts.isNotEmpty) parts.removeLast();
-              parts.add(tag);
-              final newQuery = '${parts.join(' ')} ';
-              _searchController.text = newQuery;
-              _searchController.selection = TextSelection.fromPosition(
-                TextPosition(offset: newQuery.length),
-              );
-              context.read<SearchBloc>().add(SearchQueryChanged(newQuery));
-            },
-          ),
-        ],
-      ),
+            // ─── Floating search header ───────────────────────────────────
+            _FloatingSearchHeader(
+              tagChips: _tagChips,
+              inputController: _inputController,
+              inputFocus: _inputFocus,
+              showSuggestions: _showSuggestions,
+              onTagRemoved: _removeTag,
+              onTagAdded: _addTag,
+              onSubmitted: (_) => _submitSearch(),
+              onFilterTapped: () => _showFilterSheet(context),
+              onSuggestionSelected: _addTag,
+              onDismissSuggestions: () {
+                setState(() => _showSuggestions = false);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -197,23 +258,31 @@ class _SearchScreenState extends State<SearchScreen>
   }
 }
 
-// ─── Floating Search Bar ───────────────────────────────────────────────────────
+// ─── Floating Search Header with Tag Chips ─────────────────────────────────
 
-class _FloatingSearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
+class _FloatingSearchHeader extends StatelessWidget {
+  final List<String> tagChips;
+  final TextEditingController inputController;
+  final FocusNode inputFocus;
+  final bool showSuggestions;
+  final ValueChanged<String> onTagRemoved;
+  final ValueChanged<String> onTagAdded;
   final ValueChanged<String> onSubmitted;
   final VoidCallback onFilterTapped;
-  final bool showSuggestions;
   final ValueChanged<String> onSuggestionSelected;
+  final VoidCallback onDismissSuggestions;
 
-  const _FloatingSearchBar({
-    required this.controller,
-    required this.onChanged,
+  const _FloatingSearchHeader({
+    required this.tagChips,
+    required this.inputController,
+    required this.inputFocus,
+    required this.showSuggestions,
+    required this.onTagRemoved,
+    required this.onTagAdded,
     required this.onSubmitted,
     required this.onFilterTapped,
-    required this.showSuggestions,
     required this.onSuggestionSelected,
+    required this.onDismissSuggestions,
   });
 
   @override
@@ -226,33 +295,43 @@ class _FloatingSearchBar extends StatelessWidget {
       left: 0,
       right: 0,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Blur background
+          // Main search bar container
           Container(
             decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor.withOpacity(0.92),
-              border: Border(
-                bottom: showSuggestions
-                    ? BorderSide.none
-                    : BorderSide(
-                        color: theme.colorScheme.outline.withOpacity(0.1),
+              color: theme.scaffoldBackgroundColor.withOpacity(0.94),
+              border: showSuggestions
+                  ? null
+                  : Border(
+                      bottom: BorderSide(
+                        color: theme.colorScheme.outline.withOpacity(0.12),
                         width: 0.5,
                       ),
-              ),
+                    ),
             ),
             child: Padding(
-              padding: EdgeInsets.fromLTRB(16, topPad + 12, 16, 12),
-              child: Row(
+              padding: EdgeInsets.fromLTRB(14, topPad + 10, 14, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: SearchBarWidget(
-                      controller: controller,
-                      onChanged: onChanged,
-                      onSubmitted: onSubmitted,
-                    ),
+                  // Input row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _TagChipInput(
+                          tagChips: tagChips,
+                          inputController: inputController,
+                          inputFocus: inputFocus,
+                          onTagRemoved: onTagRemoved,
+                          onTagAdded: onTagAdded,
+                          onSubmitted: onSubmitted,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      _FilterButton(onTap: onFilterTapped),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  _FilterButton(onTap: onFilterTapped),
                 ],
               ),
             ),
@@ -270,6 +349,147 @@ class _FloatingSearchBar extends StatelessWidget {
                 );
               },
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Tag Chip Input ────────────────────────────────────────────────────────
+
+class _TagChipInput extends StatelessWidget {
+  final List<String> tagChips;
+  final TextEditingController inputController;
+  final FocusNode inputFocus;
+  final ValueChanged<String> onTagRemoved;
+  final ValueChanged<String> onTagAdded;
+  final ValueChanged<String> onSubmitted;
+
+  const _TagChipInput({
+    required this.tagChips,
+    required this.inputController,
+    required this.inputFocus,
+    required this.onTagRemoved,
+    required this.onTagAdded,
+    required this.onSubmitted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return GestureDetector(
+      onTap: () => inputFocus.requestFocus(),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 44),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: theme.colorScheme.outline.withOpacity(0.2),
+            width: 0.5,
+          ),
+        ),
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            // Search icon
+            Icon(
+              Icons.search_rounded,
+              size: 18,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            // Tag chips
+            for (final tag in tagChips)
+              _TagChip(
+                tag: tag,
+                onRemove: () => onTagRemoved(tag),
+              ),
+            // Text input
+            IntrinsicWidth(
+              child: TextField(
+                controller: inputController,
+                focusNode: inputFocus,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: tagChips.isEmpty ? 'Search tags...' : 'Add tag...',
+                  hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                textInputAction: TextInputAction.search,
+                onSubmitted: (v) {
+                  if (v.trim().isNotEmpty) {
+                    onTagAdded(v.trim());
+                  } else {
+                    onSubmitted(v);
+                  }
+                },
+                // Space bar also adds tag
+                onChanged: (v) {
+                  if (v.endsWith(' ') && v.trim().isNotEmpty) {
+                    onTagAdded(v.trim());
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TagChip extends StatelessWidget {
+  final String tag;
+  final VoidCallback onRemove;
+
+  const _TagChip({required this.tag, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      height: 26,
+      padding: const EdgeInsets.only(left: 10, right: 4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: theme.colorScheme.primary.withOpacity(0.3),
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            tag.replaceAll('_', ' '),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onRemove();
+            },
+            child: Icon(
+              Icons.close_rounded,
+              size: 14,
+              color: theme.colorScheme.primary.withOpacity(0.7),
+            ),
+          ),
         ],
       ),
     );
@@ -305,12 +525,12 @@ class _FilterButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: hasFilters
                   ? theme.colorScheme.primaryContainer
-                  : theme.colorScheme.surfaceContainerHighest,
+                  : theme.colorScheme.surfaceContainerHighest.withOpacity(0.7),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: hasFilters
-                    ? theme.colorScheme.primary.withOpacity(0.5)
-                    : theme.colorScheme.outline.withOpacity(0.3),
+                    ? theme.colorScheme.primary.withOpacity(0.4)
+                    : theme.colorScheme.outline.withOpacity(0.2),
                 width: 0.5,
               ),
             ),
@@ -363,12 +583,12 @@ class _SuggestionsDropdown extends StatelessWidget {
         color: theme.colorScheme.surface,
         border: Border(
           bottom: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.15),
+            color: theme.colorScheme.outline.withOpacity(0.12),
             width: 0.5,
           ),
         ),
       ),
-      constraints: const BoxConstraints(maxHeight: 240),
+      constraints: const BoxConstraints(maxHeight: 220),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 4),
         shrinkWrap: true,
@@ -376,22 +596,32 @@ class _SuggestionsDropdown extends StatelessWidget {
         itemBuilder: (context, index) {
           final tag = suggestions[index];
           return InkWell(
-            onTap: () => onSelected(tag),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onSelected(tag);
+            },
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
               child: Row(
                 children: [
                   Icon(
                     Icons.tag_rounded,
-                    size: 14,
+                    size: 13,
                     color: theme.colorScheme.primary.withOpacity(0.7),
                   ),
                   const SizedBox(width: 10),
-                  Text(
-                    tag.replaceAll('_', ' '),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface,
+                  Expanded(
+                    child: Text(
+                      tag.replaceAll('_', ' '),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                      ),
                     ),
+                  ),
+                  Icon(
+                    Icons.north_west_rounded,
+                    size: 12,
+                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
                   ),
                 ],
               ),
@@ -403,38 +633,100 @@ class _SuggestionsDropdown extends StatelessWidget {
   }
 }
 
-class _SourceFilter extends StatelessWidget {
+// ─── Source Filter Chips ──────────────────────────────────────────────────
+
+class _SourceChips extends StatelessWidget {
   final SearchState state;
-  const _SourceFilter({required this.state});
+  const _SourceChips({required this.state});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SizedBox(
-      height: 44,
-      child: ListView(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        children: BooruSource.values.take(4).map((source) {
-          final isActive = state.activeSources.contains(source);
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: Text(source.shortName),
-              selected: isActive,
-              onSelected: (_) {
-                HapticFeedback.selectionClick();
-                context.read<SearchBloc>().add(SearchSourceToggled(source));
-              },
-              showCheckmark: false,
-            ),
-          );
-        }).toList(),
+        child: Row(
+          children: BooruSource.values.take(4).map((source) {
+            final isActive = state.activeSources.contains(source);
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: _SourceChip(
+                source: source,
+                isActive: isActive,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  context
+                      .read<SearchBloc>()
+                      .add(SearchSourceToggled(source));
+                },
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
 }
+
+class _SourceChip extends StatelessWidget {
+  final BooruSource source;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _SourceChip({
+    required this.source,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  Color get _sourceColor {
+    switch (source) {
+      case BooruSource.rule34xxx:
+        return const Color(0xFF7C6FFF);
+      case BooruSource.e621:
+        return const Color(0xFF4ECDC4);
+      case BooruSource.gelbooru:
+        return const Color(0xFFFF7CA0);
+      case BooruSource.paheal:
+        return const Color(0xFFFFCC7C);
+      default:
+        return const Color(0xFF7C8FFF);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = _sourceColor;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isActive ? color.withOpacity(0.18) : theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? color.withOpacity(0.5) : theme.colorScheme.outline.withOpacity(0.15),
+            width: isActive ? 1.0 : 0.5,
+          ),
+        ),
+        child: Text(
+          source.shortName,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: isActive ? color : theme.colorScheme.onSurfaceVariant,
+            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Results Header ───────────────────────────────────────────────────────
 
 class _ResultsHeader extends StatelessWidget {
   final SearchState state;
@@ -444,60 +736,65 @@ class _ResultsHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Text(
-                // hasMore=true means at least one source might still have
-                // more to give - showing a bare "N results" in that case
-                // implies N is the final total, which it isn't. The "+"
-                // makes clear this is a loaded-so-far count, not a total.
-                state.hasMore
-                    ? '${state.posts.length}+ results'
-                    : '${state.posts.length} results',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              // Accurate count display
+              // hasMore=true → at least one source has more pages;
+              // show "N+ results" to signal this is not the final total.
+              // hasMore=false → all sources are exhausted; show exact count.
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  state.hasMore
+                      ? '${state.posts.length}+ loaded'
+                      : '${state.posts.length} result${state.posts.length == 1 ? '' : 's'}',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               const Spacer(),
               if (state.tagString.isNotEmpty)
-                Text(
-                  '"${state.tagString}"',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.primary,
+                Flexible(
+                  child: Text(
+                    '"${state.tagString}"',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.primary.withOpacity(0.8),
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
             ],
           ),
-          // A source failing (network/auth/rate-limit) is surfaced
-          // explicitly instead of silently blending into "0 results" -
-          // the user needs to know the count they're seeing may be
-          // incomplete because of an error, not because that's genuinely
-          // everything available.
           if (state.failedSources.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppColors.warning.withOpacity(0.12),
+                  color: AppColors.warning.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.warning.withOpacity(0.35)),
+                  border:
+                      Border.all(color: AppColors.warning.withOpacity(0.3)),
                 ),
                 child: Row(
                   children: [
                     const Icon(Icons.error_outline_rounded,
-                        size: 16, color: AppColors.warning),
+                        size: 14, color: AppColors.warning),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '${state.failedSources.map((s) => s.shortName).join(', ')} '
-                        '${state.failedSources.length == 1 ? 'failed' : 'failed'} to load - '
-                        'results shown may be incomplete.',
+                        '${state.failedSources.map((s) => s.shortName).join(', ')} failed — results may be incomplete.',
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: theme.colorScheme.onSurface,
                         ),
@@ -512,6 +809,8 @@ class _ResultsHeader extends StatelessWidget {
     );
   }
 }
+
+// ─── Empty / Loading / Error States ──────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
@@ -529,13 +828,13 @@ class _EmptyState extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                color: theme.colorScheme.primaryContainer.withOpacity(0.25),
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Icon(
                 Icons.image_search_rounded,
                 size: 40,
-                color: theme.colorScheme.primary.withOpacity(0.6),
+                color: theme.colorScheme.primary.withOpacity(0.5),
               ),
             ),
             const SizedBox(height: 24),
@@ -546,8 +845,10 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Enter tags above to search across\nyour selected sources',
-              style: theme.textTheme.bodyMedium,
+              'Type a tag above and press enter,\nor tap a suggestion to search',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -570,18 +871,18 @@ class _LoadingGrid extends StatelessWidget {
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
-          crossAxisSpacing: 4,
-          mainAxisSpacing: 4,
-          childAspectRatio: 0.8,
+          crossAxisSpacing: 6,
+          mainAxisSpacing: 6,
+          childAspectRatio: 0.75,
         ),
-        itemCount: 18,
+        itemCount: 12,
         itemBuilder: (_, __) => Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
           ),
         ),
       ),
@@ -604,13 +905,25 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.wifi_off_rounded,
-              size: 52,
-              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.errorContainer.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(
+                Icons.wifi_off_rounded,
+                size: 36,
+                color: theme.colorScheme.error.withOpacity(0.7),
+              ),
             ),
             const SizedBox(height: 20),
-            Text(message, style: theme.textTheme.bodyLarge),
+            Text(
+              message,
+              style: theme.textTheme.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 20),
             FilledButton.tonal(
               onPressed: onRetry,
@@ -636,14 +949,16 @@ class _NoResultsState extends StatelessWidget {
           Icon(
             Icons.search_off_rounded,
             size: 52,
-            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
+            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.35),
           ),
           const SizedBox(height: 16),
           Text('No results found', style: theme.textTheme.headlineMedium),
           const SizedBox(height: 8),
           Text(
             'Try different tags or change\nyour active sources',
-            style: theme.textTheme.bodyMedium,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
             textAlign: TextAlign.center,
           ),
         ],

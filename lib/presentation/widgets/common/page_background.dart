@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../../main.dart' show ThemeScope;
 
-/// Paints the active theme preset's gradient as an *opaque* full-screen
+/// Paints the active theme preset's gradient as an opaque full-screen
 /// background for a single screen.
 ///
-/// Why this exists: making each tab screen's own Scaffold background
-/// transparent (so MainShell's shared gradient shows through) seems like
-/// the simple way to apply the gradient everywhere, but it breaks page
-/// transitions - during a tab switch, both the outgoing and incoming
-/// screens are transparent, so neither one visually covers the other and
-/// their content overlaps/ghosts together mid-transition. Wrapping each
-/// screen's content in its own opaque copy of the same gradient fixes
-/// this: every screen is independently opaque, so transitions look
-/// correct, while still all sharing the same visual background.
+/// Each tab screen owns its own opaque copy of the shared gradient so that
+/// page transitions don't ghost/overlap (two transparent screens on top of
+/// each other show both their content simultaneously mid-transition).
+///
+/// The child is expected to be a scrollable (CustomScrollView, ListView, etc.)
+/// or Scaffold body. PageBackground itself just wraps with the gradient and
+/// constrains to fill the available space — it does NOT add a Scaffold.
 class PageBackground extends StatelessWidget {
   final Widget child;
   const PageBackground({super.key, required this.child});
@@ -23,12 +21,16 @@ class PageBackground extends StatelessWidget {
     return AnimatedBuilder(
       animation: themeController,
       builder: (context, _) {
-        return DecoratedBox(
+        return Container(
+          // Fill the full screen including behind the system status bar
+          width: double.infinity,
+          height: double.infinity,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: themeController.preset.gradient(themeController.brightness),
+              colors: themeController.preset
+                  .gradient(themeController.brightness),
             ),
           ),
           child: child,

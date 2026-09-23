@@ -15,8 +15,12 @@ class FavoritesScreen extends StatefulWidget {
   State<FavoritesScreen> createState() => _FavoritesScreenState();
 }
 
-class _FavoritesScreenState extends State<FavoritesScreen> {
+class _FavoritesScreenState extends State<FavoritesScreen>
+    with AutomaticKeepAliveClientMixin {
   List<Post> _favorites = [];
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -24,65 +28,132 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     _load();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _load();
+  }
+
   void _load() {
     final repo = context.read<LocalRepository>();
-    setState(() => _favorites = repo.getFavorites());
+    final favs = repo.getFavorites();
+    if (favs.length != _favorites.length) {
+      setState(() => _favorites = favs);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final theme = Theme.of(context);
+
     return PageBackground(
       child: CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        SliverAppBar.large(
-          title: const Text('Favorites'),
-          backgroundColor: Colors.transparent,
-          pinned: true,
-          actions: [
-            if (_favorites.isNotEmpty)
-              IconButton(
-                icon: const Icon(Icons.sort_rounded),
-                onPressed: () {},
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // Header
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                MediaQuery.of(context).padding.top + 20,
+                20,
+                16,
               ),
-          ],
-        ),
-        if (_favorites.isEmpty)
-          SliverFillRemaining(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+              child: Row(
                 children: [
-                  Icon(
-                    Icons.favorite_outline_rounded,
-                    size: 64,
-                    color: theme.colorScheme.onSurface.withOpacity(0.2),
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.ratingExplicit.withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.favorite_rounded,
+                      size: 18,
+                      color: AppColors.ratingExplicit,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Text('No favorites yet', style: theme.textTheme.headlineMedium),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Tap ♥ on any post to save it here',
-                    style: theme.textTheme.bodyMedium,
-                  ),
+                  const SizedBox(width: 12),
+                  Text('Favorites', style: theme.textTheme.headlineLarge),
+                  const Spacer(),
+                  if (_favorites.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest
+                            .withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${_favorites.length}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
-          )
-        else
-          PostGridSliver(
-            posts: _favorites,
-            columns: context.read<LocalRepository>().getGridColumns(),
-            onPostTapped: (post, index) {
-              context.push('/viewer', extra: {
-                'posts': _favorites,
-                'index': index,
-              });
-            },
           ),
-        const SliverToBoxAdapter(child: SizedBox(height: 100)),
-      ],
+
+          // Content
+          if (_favorites.isEmpty)
+            SliverFillRemaining(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(40),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: AppColors.ratingExplicit.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Icon(
+                          Icons.favorite_outline_rounded,
+                          size: 40,
+                          color: AppColors.ratingExplicit.withOpacity(0.5),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'No favorites yet',
+                        style: theme.textTheme.headlineMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tap ♥ on any post to save it here',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            PostGridSliver(
+              posts: _favorites,
+              columns: context.read<LocalRepository>().getGridColumns(),
+              onPostTapped: (post, index) {
+                context.push('/viewer', extra: {
+                  'posts': _favorites,
+                  'index': index,
+                });
+              },
+            ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+        ],
       ),
     );
   }
