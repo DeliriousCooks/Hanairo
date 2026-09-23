@@ -7,6 +7,7 @@ import '../../../data/repositories/local_repository.dart';
 import '../../../domain/entities/post.dart';
 import '../../widgets/grid/post_grid.dart';
 import '../../blocs/search_bloc.dart';
+import '../../widgets/common/page_background.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -31,7 +32,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return CustomScrollView(
+    return PageBackground(
+      child: CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
         SliverAppBar.large(
@@ -71,6 +73,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         else
           PostGridSliver(
             posts: _favorites,
+            columns: context.read<LocalRepository>().getGridColumns(),
             onPostTapped: (post, index) {
               context.push('/viewer', extra: {
                 'posts': _favorites,
@@ -80,6 +83,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ),
         const SliverToBoxAdapter(child: SizedBox(height: 100)),
       ],
+      ),
     );
   }
 }

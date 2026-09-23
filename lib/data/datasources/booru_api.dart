@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:xml/xml.dart';
 import '../../domain/entities/post.dart';
 import '../../core/utils/logger.dart';
+import '../../core/tags/tag_translator.dart';
 
 abstract class BooruDataSource {
   BooruSource get source;
@@ -98,14 +99,14 @@ class Rule34xxxDataSource implements BooruDataSource {
   }
 
   String _buildTagString(SearchQuery query) {
-    var tags = List<String>.from(query.tags);
+    var tags = TagTranslator.translate(query.tags, BooruSource.rule34xxx);
     if (query.ratingFilter != null) {
       tags.add('rating:${_ratingToString(query.ratingFilter!)}');
     }
     if (query.minScore != null) {
       tags.add('score:>=${query.minScore}');
     }
-    return tags.join('+');
+    return tags.join(TagTranslator.separator(BooruSource.rule34xxx));
   }
 
   @override
@@ -282,7 +283,7 @@ class E621DataSource implements BooruDataSource {
   }
 
   String _buildTagString(SearchQuery query) {
-    var tags = List<String>.from(query.tags);
+    var tags = TagTranslator.translate(query.tags, BooruSource.e621);
     if (query.ratingFilter != null) {
       tags.add('rating:${_e621RatingString(query.ratingFilter!)}');
     }
@@ -293,7 +294,7 @@ class E621DataSource implements BooruDataSource {
       final types = query.fileTypeFilter!.map(_fileTypeToExt).join(',');
       tags.add('type:$types');
     }
-    return tags.join(' ');
+    return tags.join(TagTranslator.separator(BooruSource.e621));
   }
 
   @override
@@ -450,11 +451,11 @@ class GelbooruDataSource implements BooruDataSource {
   }
 
   String _buildTagString(SearchQuery query) {
-    var tags = List<String>.from(query.tags);
+    var tags = TagTranslator.translate(query.tags, BooruSource.gelbooru);
     if (query.ratingFilter != null) {
       tags.add('rating:${_ratingToString(query.ratingFilter!)}');
     }
-    return tags.join('+');
+    return tags.join(TagTranslator.separator(BooruSource.gelbooru));
   }
 
   @override
@@ -535,7 +536,7 @@ class PahealDataSource implements BooruDataSource {
   @override
   Future<List<Post>> search(SearchQuery query) async {
     try {
-      final tagString = query.tags.join(' ');
+      final tagString = TagTranslator.translateForSource(query.tags, BooruSource.paheal);
       final page = query.page + 1;
       final response = await _dio.get(
         '/api/danbooru/find_posts/index.xml',

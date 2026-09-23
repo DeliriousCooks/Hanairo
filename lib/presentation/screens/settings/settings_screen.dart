@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_settings.dart';
 import '../../../main.dart' show ThemeScope;
+import '../../widgets/common/page_background.dart';
 import '../../../data/repositories/local_repository.dart';
 import '../../../domain/entities/post.dart';
 
@@ -34,7 +35,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final repo = context.read<LocalRepository>();
     final themeController = ThemeScope.of(context);
 
-    return CustomScrollView(
+    return PageBackground(
+      child: CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
         SliverAppBar.large(
@@ -381,6 +383,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

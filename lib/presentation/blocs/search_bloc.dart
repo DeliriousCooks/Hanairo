@@ -69,6 +69,7 @@ class SearchState extends Equatable {
   final List<FileType>? fileTypeFilter;
   final Map<BooruSource, int> pageBySource;
   final Map<BooruSource, bool> hasMoreBySource;
+  final List<BooruSource> failedSources;
   final String? errorMessage;
   final List<String> tagSuggestions;
 
@@ -82,6 +83,7 @@ class SearchState extends Equatable {
     this.fileTypeFilter,
     this.pageBySource = const {},
     this.hasMoreBySource = const {},
+    this.failedSources = const [],
     this.errorMessage,
     this.tagSuggestions = const [],
   });
@@ -107,6 +109,7 @@ class SearchState extends Equatable {
     bool clearFileTypeFilter = false,
     Map<BooruSource, int>? pageBySource,
     Map<BooruSource, bool>? hasMoreBySource,
+    List<BooruSource>? failedSources,
     String? errorMessage,
     bool clearError = false,
     List<String>? tagSuggestions,
@@ -121,6 +124,7 @@ class SearchState extends Equatable {
       fileTypeFilter: clearFileTypeFilter ? null : (fileTypeFilter ?? this.fileTypeFilter),
       pageBySource: pageBySource ?? this.pageBySource,
       hasMoreBySource: hasMoreBySource ?? this.hasMoreBySource,
+      failedSources: failedSources ?? this.failedSources,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       tagSuggestions: tagSuggestions ?? this.tagSuggestions,
     );
@@ -152,6 +156,7 @@ class SearchState extends Equatable {
         fileTypeFilter,
         pageBySource,
         hasMoreBySource,
+        failedSources,
         errorMessage,
         tagSuggestions,
       ];
@@ -175,8 +180,17 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
               .map((s) => BooruSource.values.firstWhere((b) => b.name == s))
               .toList(),
         )) {
-    on<SearchSubmitted>(_onSearchSubmitted);
-    on<SearchLoadMore>(_onSearchLoadMore);
+    // switchMap: if the user fires a new search before the previous one
+    // finishes, the previous in-flight search is cancelled instead of
+    // being allowed to land later and overwrite newer results. Same
+    // pattern already used below for SearchQueryChanged.
+    on<SearchSubmitted>(_onSearchSubmitted,
+        transformer: (events, mapper) => events.switchMap(mapper));
+    // exhaustMap (droppable): while a load-more is already in flight,
+    // additional load-more events (e.g. rapid scroll-triggered calls)
+    // are dropped instead of racing each other and double-appending pages.
+    on<SearchLoadMore>(_onSearchLoadMore,
+        transformer: (events, mapper) => events.exhaustMap(mapper));
     on<SearchRefreshed>(_onSearchRefreshed);
     on<SearchQueryChanged>(_onQueryChanged,
         transformer: (events, mapper) =>
@@ -197,6 +211,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       posts: [],
       pageBySource: {for (final s in event.sources) s: 0},
       hasMoreBySource: {for (final s in event.sources) s: true},
+      failedSources: const [],
       clearError: true,
       tagSuggestions: [],
     ));
@@ -208,20 +223,28 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
 
     try {
       final query = state.currentQuery;
-      final perSource = await _searchRepo.searchPerSource(query);
-      final merged = perSource.values.expand((p) => p).toList();
+      final perSource = await _searchRepo.searchPerSourceDetailed(query);
+      final merged = perSource.values.expand((r) => r.posts).toList();
       if (query.sources.length > 1) {
         merged.sort((a, b) => b.score.compareTo(a.score));
       }
-      final filtered = _applyBlacklist(merged);
+      final deduped = _dedupeAgainst(const [], merged);
+      final filtered = _applyBlacklist(deduped);
+      final failed = perSource.entries.where((e) => e.value.failed).map((e) => e.key).toList();
 
       emit(state.copyWith(
         status: SearchStatus.success,
         posts: filtered,
+        // A source is only truly exhausted when it returns an empty page.
+        // Treating "fewer than the requested limit" as end-of-results is
+        // wrong for these APIs - a page can legitimately come back short
+        // (moderation/deletion between calls, provider-side trimming)
+        // without meaning there's nothing left to paginate into. This is
+        // what was capping combined searches at ~79 results.
         hasMoreBySource: {
-          for (final entry in perSource.entries)
-            entry.key: entry.value.length >= query.limit,
+          for (final entry in perSource.entries) entry.key: entry.value.posts.isNotEmpty,
         },
+        failedSources: failed,
       ));
     } catch (e) {
       emit(state.copyWith(
@@ -262,12 +285,13 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       }));
 
       final newPosts = results.expand((e) => e.value).toList();
-      final filtered = _applyBlacklist(newPosts);
+      final deduped = _dedupeAgainst(state.posts, newPosts);
+      final filtered = _applyBlacklist(deduped);
 
       final updatedPageBySource = {...state.pageBySource, ...nextPageBySource};
       final updatedHasMoreBySource = {...state.hasMoreBySource};
       for (final entry in results) {
-        updatedHasMoreBySource[entry.key] = entry.value.length >= baseQuery.limit;
+        updatedHasMoreBySource[entry.key] = entry.value.isNotEmpty;
       }
 
       final combined = [...state.posts, ...filtered];
@@ -376,6 +400,27 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
 
   List<Post> _applyBlacklist(List<Post> posts) {
     return posts.where((p) => !_localRepo.isBlacklisted(p)).toList();
+  }
+
+  /// Stable identity for a post across sources/pages, used to drop
+  /// duplicates. Combines source + id since two different sources can
+  /// coincidentally use the same numeric post id.
+  String _postKey(Post p) => '${p.source.name}_${p.id}';
+
+  /// Removes posts already present in [existing] from [incoming], and also
+  /// de-dupes within [incoming] itself. Needed because: (a) pagination can
+  /// occasionally hand back an overlapping post across page boundaries,
+  /// and (b) multiple active sources could in principle surface the same
+  /// underlying post. Without this, duplicates would eat into the visible
+  /// "slots" a user scrolls through without adding anything new.
+  List<Post> _dedupeAgainst(List<Post> existing, List<Post> incoming) {
+    final seen = existing.map(_postKey).toSet();
+    final result = <Post>[];
+    for (final post in incoming) {
+      final key = _postKey(post);
+      if (seen.add(key)) result.add(post);
+    }
+    return result;
   }
 
   @override

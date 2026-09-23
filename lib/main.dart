@@ -192,16 +192,10 @@ class MainShell extends StatelessWidget {
         return Scaffold(
           extendBody: true,
           extendBodyBehindAppBar: true,
-          body: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: themeController.preset.gradient(themeController.brightness),
-              ),
-            ),
-            child: child,
-          ),
+          // Each individual tab screen now paints its own opaque copy of
+          // this gradient (see PageBackground) so page transitions don't
+          // ghost/overlap - this body is just a plain passthrough.
+          body: child,
           bottomNavigationBar: _BottomNav(
             selectedIndex: _indexForLocation(context),
             glass: themeController.glass,

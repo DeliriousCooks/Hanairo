@@ -10,6 +10,8 @@ import '../../widgets/grid/post_grid.dart';
 import '../../widgets/search/search_bar_widget.dart';
 import '../../widgets/search/filter_sheet.dart';
 import '../../widgets/common/source_badge.dart';
+import '../../widgets/common/page_background.dart';
+import '../../../data/repositories/local_repository.dart';
 
 class SearchScreen extends StatefulWidget {
   final String initialQuery;
@@ -71,7 +73,8 @@ class _SearchScreenState extends State<SearchScreen>
     super.build(context);
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return PageBackground(
+      child: Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
@@ -123,6 +126,7 @@ class _SearchScreenState extends State<SearchScreen>
                   else ...[
                     PostGridSliver(
                       posts: state.posts,
+                      columns: context.read<LocalRepository>().getGridColumns(),
                       onPostTapped: (post, index) {
                         context.push('/viewer', extra: {
                           'posts': state.posts,
@@ -175,6 +179,7 @@ class _SearchScreenState extends State<SearchScreen>
             },
           ),
         ],
+      ),
       ),
     );
   }
@@ -440,22 +445,61 @@ class _ResultsHeader extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${state.posts.length} results',
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const Spacer(),
-          if (state.tagString.isNotEmpty)
-            Text(
-              '"${state.tagString}"',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.primary,
+          Row(
+            children: [
+              Text(
+                '${state.posts.length} results',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
+              const Spacer(),
+              if (state.tagString.isNotEmpty)
+                Text(
+                  '"${state.tagString}"',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ],
+          ),
+          // A source failing (network/auth/rate-limit) is surfaced
+          // explicitly instead of silently blending into "0 results" -
+          // the user needs to know the count they're seeing may be
+          // incomplete because of an error, not because that's genuinely
+          // everything available.
+          if (state.failedSources.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.warning.withOpacity(0.35)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline_rounded,
+                        size: 16, color: AppColors.warning),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${state.failedSources.map((s) => s.shortName).join(', ')} '
+                        '${state.failedSources.length == 1 ? 'failed' : 'failed'} to load - '
+                        'results shown may be incomplete.',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
         ],
       ),

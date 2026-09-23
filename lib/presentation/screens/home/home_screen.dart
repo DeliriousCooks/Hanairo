@@ -8,6 +8,7 @@ import '../../../domain/entities/post.dart';
 import '../../blocs/search_bloc.dart';
 import '../../widgets/common/glass_card.dart';
 import '../../widgets/common/source_badge.dart';
+import '../../widgets/common/page_background.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -65,7 +66,8 @@ class _HomeContentState extends State<_HomeContent>
     final history = localRepo.getSearchHistory();
     final favorites = localRepo.getFavorites().take(6).toList();
 
-    return CustomScrollView(
+    return PageBackground(
+      child: CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
         // ─── Large Title Header ──────────────────────────────────────────────
@@ -150,6 +152,7 @@ class _HomeContentState extends State<_HomeContent>
         // Bottom padding for nav bar
         const SliverToBoxAdapter(child: SizedBox(height: 100)),
       ],
+      ),
     );
   }
 }
