@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoPage;
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/theme/theme_settings.dart';
-import 'core/utils/logger.dart';
 import 'presentation/widgets/common/glass_container.dart';
 import 'data/repositories/search_repository.dart';
 import 'data/repositories/local_repository.dart';
@@ -26,8 +24,7 @@ late final ThemeController _themeController;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Transparent status bar, immersive dark
+
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
@@ -38,8 +35,7 @@ void main() async {
 
   await _localRepo.init();
   _themeController = ThemeController(_localRepo);
-  
-  // Restore credentials
+
   final creds = await _localRepo.loadCredentials();
   for (final entry in creds.entries) {
     final source = BooruSource.values.firstWhere(
@@ -64,43 +60,45 @@ final _router = GoRouter(
       routes: [
         GoRoute(
           path: '/',
-          builder: (context, state) => const HomeScreen(),
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: HomeScreen(),
+          ),
         ),
         GoRoute(
           path: '/search',
-          builder: (context, state) {
+          pageBuilder: (context, state) {
             final query = state.uri.queryParameters['q'] ?? '';
-            return SearchScreen(initialQuery: query);
+            return NoTransitionPage(
+              child: SearchScreen(initialQuery: query),
+            );
           },
         ),
         GoRoute(
           path: '/favorites',
-          builder: (context, state) => const FavoritesScreen(),
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: FavoritesScreen(),
+          ),
         ),
         GoRoute(
           path: '/settings',
-          builder: (context, state) => const SettingsScreen(),
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: SettingsScreen(),
+          ),
         ),
       ],
     ),
+    // Viewer is outside the shell (full screen, no nav bar)
     GoRoute(
       path: '/viewer',
-      // Uses pageBuilder (not the default builder:) so we can hand back a
-      // CupertinoPage with allowSnapshotting: false. Without that, iOS's
-      // interactive swipe-back gesture drags a pre-rendered *snapshot
-      // texture* of this route around instead of the live widget - and if
-      // that snapshot gets captured before the viewer's image has
-      // finished painting (very likely for a route with an async image),
-      // the user drags around a blank grey placeholder instead of the
-      // actual photo. allowSnapshotting: false forces the live widget to
-      // keep rendering during the gesture instead, which is the
-      // documented fix for exactly this class of bug.
       pageBuilder: (context, state) {
         final extra = state.extra as Map<String, dynamic>?;
         final posts = extra?['posts'] as List<Post>? ?? [];
         final index = extra?['index'] as int? ?? 0;
         return CupertinoPage(
           key: state.pageKey,
+          // FIX: allowSnapshotting: false prevents the swipe-back gesture
+          // from capturing a snapshot of an unfinished image load, which
+          // was the iOS-side cause of the grey screen bug on back swipe.
           allowSnapshotting: false,
           child: ViewerScreen(posts: posts, initialIndex: index),
         );
@@ -141,9 +139,6 @@ class BooruApp extends StatelessWidget {
   }
 }
 
-/// Makes the app-wide [ThemeController] available to any descendant via
-/// `ThemeScope.of(context)`. Widgets that call this inside build() are
-/// automatically rebuilt whenever the controller's theme settings change.
 class ThemeScope extends InheritedNotifier<ThemeController> {
   const ThemeScope({
     super.key,
@@ -193,9 +188,19 @@ class MainShell extends StatelessWidget {
   static const _routes = ['/', '/search', '/favorites', '/settings'];
 
   int _indexForLocation(BuildContext context) {
-    final location = GoRouterState.of(context).uri.path;
-    final index = _routes.indexOf(location);
-    return index == -1 ? 0 : index;
+    // FIX: Use full path comparison and handle sub-paths correctly.
+    // GoRouterState.of gives the current route state.
+    final path = GoRouterState.of(context).uri.path;
+    // Exact match first
+    final exact = _routes.indexOf(path);
+    if (exact != -1) return exact;
+    // Prefix match for sub-routes (e.g. /search?q=foo → index 1)
+    for (var i = _routes.length - 1; i >= 0; i--) {
+      if (path.startsWith(_routes[i]) && _routes[i] != '/') {
+        return i;
+      }
+    }
+    return 0;
   }
 
   @override
@@ -205,17 +210,22 @@ class MainShell extends StatelessWidget {
       animation: themeController,
       builder: (context, _) {
         return Scaffold(
+          // FIX: extendBody ensures content flows under the floating nav bar
+          // so post grids and scroll views use the full screen height.
           extendBody: true,
           extendBodyBehindAppBar: true,
-          // Each individual tab screen now paints its own opaque copy of
-          // this gradient (see PageBackground) so page transitions don't
-          // ghost/overlap - this body is just a plain passthrough.
           body: child,
           bottomNavigationBar: _BottomNav(
             selectedIndex: _indexForLocation(context),
             glass: themeController.glass,
             onDestinationSelected: (index) {
-              context.go(_routes[index]);
+              // FIX: Only navigate if we're not already on this route
+              // to prevent unnecessary rebuilds.
+              final current = GoRouterState.of(context).uri.path;
+              final target = _routes[index];
+              if (current != target) {
+                context.go(target);
+              }
             },
           ),
         );
@@ -300,7 +310,7 @@ class _NavItem extends StatelessWidget {
         curve: Curves.easeOut,
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.9) : Colors.transparent,
+          color: selected ? color.withOpacity(0.88) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
@@ -309,7 +319,9 @@ class _NavItem extends StatelessWidget {
             Icon(
               selected ? selectedIcon : icon,
               size: 22,
-              color: selected ? Colors.white : theme.colorScheme.onSurfaceVariant,
+              color: selected
+                  ? Colors.white
+                  : theme.colorScheme.onSurfaceVariant,
             ),
             if (!selected) ...[
               const SizedBox(height: 3),
