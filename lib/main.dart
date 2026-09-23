@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoPage;
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -84,11 +85,25 @@ final _router = GoRouter(
     ),
     GoRoute(
       path: '/viewer',
-      builder: (context, state) {
+      // Uses pageBuilder (not the default builder:) so we can hand back a
+      // CupertinoPage with allowSnapshotting: false. Without that, iOS's
+      // interactive swipe-back gesture drags a pre-rendered *snapshot
+      // texture* of this route around instead of the live widget - and if
+      // that snapshot gets captured before the viewer's image has
+      // finished painting (very likely for a route with an async image),
+      // the user drags around a blank grey placeholder instead of the
+      // actual photo. allowSnapshotting: false forces the live widget to
+      // keep rendering during the gesture instead, which is the
+      // documented fix for exactly this class of bug.
+      pageBuilder: (context, state) {
         final extra = state.extra as Map<String, dynamic>?;
         final posts = extra?['posts'] as List<Post>? ?? [];
         final index = extra?['index'] as int? ?? 0;
-        return ViewerScreen(posts: posts, initialIndex: index);
+        return CupertinoPage(
+          key: state.pageKey,
+          allowSnapshotting: false,
+          child: ViewerScreen(posts: posts, initialIndex: index),
+        );
       },
     ),
     GoRoute(

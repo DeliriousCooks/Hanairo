@@ -30,9 +30,17 @@ class PostGridSliver extends StatelessWidget {
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) {
+            final post = posts[index];
             return PostTile(
-              post: posts[index],
-              onTap: () => onPostTapped(posts[index], index),
+              // Stable key (not just index) so Flutter correctly preserves
+              // each tile's element/render state across rebuilds instead
+              // of potentially reassociating it with a different post if
+              // the list ever reorders (dedup, blacklist filtering, a
+              // fresh list instance from pagination) - this is part of
+              // what caused visible jumping/flicker when new pages loaded.
+              key: ValueKey('${post.source.name}_${post.id}'),
+              post: post,
+              onTap: () => onPostTapped(post, index),
             );
           },
           childCount: posts.length,

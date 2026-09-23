@@ -451,7 +451,13 @@ class _ResultsHeader extends StatelessWidget {
           Row(
             children: [
               Text(
-                '${state.posts.length} results',
+                // hasMore=true means at least one source might still have
+                // more to give - showing a bare "N results" in that case
+                // implies N is the final total, which it isn't. The "+"
+                // makes clear this is a loaded-so-far count, not a total.
+                state.hasMore
+                    ? '${state.posts.length}+ results'
+                    : '${state.posts.length} results',
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
