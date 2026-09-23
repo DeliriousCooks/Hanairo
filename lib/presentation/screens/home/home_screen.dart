@@ -536,7 +536,7 @@ class _FavoritePreviewCard extends StatelessWidget {
               ? CachedNetworkImage(
                   imageUrl: post.thumbnailUrl!,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Center(
+                  errorWidget: (_, __, ___) => const Center(
                     child: Icon(Icons.broken_image_outlined, size: 24),
                   ),
                 )
