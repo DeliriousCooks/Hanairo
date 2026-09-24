@@ -1,3 +1,10 @@
+# BooruWave UI update v17
+
+This is the v17 source overlay, based on v16. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
+
+## v17 search-field alignment fix
+
+- Vertically adjusted the search hint and entered text so they appear optically centered in the glass search dock.
 # BooruWave UI update v16
 
 This is the v16 source overlay, based on v15. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
@@ -75,4 +82,5 @@ Glass is limited to navigation and search controls so the art and feed content r
 - Fixed Gelbooru credentials to use User ID and API Key fields, and passed saved Rule34/Gelbooru credentials to search, tag-count, and suggestion requests.
 
 Rule34 currently requires API credentials for API search requests. Gelbooru may require them at times. The auth screens explain where to retrieve each site's credentials.
+
 

@@ -518,7 +518,10 @@ class _TagChipInput extends StatelessWidget {
           child: TextField(
             controller: inputController,
             focusNode: inputFocus,
-            textAlignVertical: TextAlignVertical.center,
+            // Flutter centers the input line box, but the visible glyphs sit
+            // noticeably high in this compact glass dock. Bias the line down
+            // slightly so the placeholder and typed text look optically centered.
+            textAlignVertical: const TextAlignVertical(y: 0.75),
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurface,
               fontSize: 16,
