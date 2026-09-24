@@ -462,10 +462,10 @@ class _TagChipInput extends StatelessWidget {
             ],
             Expanded(
               child: TextField(
-                  controller: inputController,
-                  focusNode: inputFocus,
-                  textAlignVertical: TextAlignVertical.center,
-                  style: theme.textTheme.bodyLarge?.copyWith(
+                controller: inputController,
+                focusNode: inputFocus,
+                textAlignVertical: TextAlignVertical.center,
+                style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurface,
                   fontSize: 16,
                 ),
@@ -493,6 +493,7 @@ class _TagChipInput extends StatelessWidget {
                     onTagAdded(v.trim());
                   }
                 },
+              ),
             ),
           ],
         ),

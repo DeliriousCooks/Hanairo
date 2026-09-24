@@ -10,6 +10,7 @@ This is a source overlay for the existing Flutter app. Copy the `lib` folder and
 - Added a persistent 2 / 3 / 4 column control to Feed, sharing the saved Grid Columns preference with Settings and Favorites. The default remains the existing two-column feed.
 - Added a single-post feed mode that loads the original image URL and fits the complete image inside the media area. Double-tap to favorite and press and hold to export an image or video to Photos.
 - Reused the Photos export helper in both the single-post feed and full-screen viewer, including the existing WebM-to-MP4 conversion path.
+- Fixed the missing closing parenthesis in the search input reported by the iOS release build.
 
 ## Changes in v13
 
