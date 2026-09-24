@@ -30,6 +30,7 @@ class _SearchScreenState extends State<SearchScreen>
   String _inputText = '';
   final _inputController = TextEditingController();
   final _inputFocus = FocusNode();
+  final _chipScrollController = ScrollController();
   bool _showSuggestions = false;
 
   @override
@@ -68,9 +69,44 @@ class _SearchScreenState extends State<SearchScreen>
   @override
   void dispose() {
     _scrollController.dispose();
+    _chipScrollController.dispose();
     _inputController.dispose();
     _inputFocus.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant SearchScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialQuery == widget.initialQuery) return;
+
+    _inputController.clear();
+    final parts = widget.initialQuery.trim().isEmpty
+        ? const <String>[]
+        : widget.initialQuery.trim().split(RegExp(r'\s+'));
+      setState(() {
+        _tagChips
+          ..clear()
+          ..addAll(parts.where((part) => part.isNotEmpty));
+      _inputText = '';
+      _showSuggestions = false;
+    });
+
+    final bloc = context.read<SearchBloc>();
+    bloc.add(SearchQueryChanged(''));
+    if (parts.isEmpty) {
+      bloc.add(SearchCleared());
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_chipScrollController.hasClients) {
+          _chipScrollController.jumpTo(
+            _chipScrollController.position.maxScrollExtent,
+          );
+        }
+        _submitSearch();
+      });
+    }
   }
 
   void _onScroll() {
@@ -88,6 +124,15 @@ class _SearchScreenState extends State<SearchScreen>
     if (cleaned.isEmpty) return;
     if (!_tagChips.contains(cleaned)) {
       setState(() => _tagChips.add(cleaned));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_chipScrollController.hasClients) {
+          _chipScrollController.animateTo(
+            _chipScrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+          );
+        }
+      });
     }
     _inputController.clear();
     setState(() {
@@ -105,6 +150,19 @@ class _SearchScreenState extends State<SearchScreen>
     _inputFocus.requestFocus();
   }
 
+  void _clearSearch() {
+    _inputController.clear();
+    setState(() {
+      _tagChips.clear();
+      _inputText = '';
+      _showSuggestions = false;
+    });
+    context.read<SearchBloc>().add(SearchCleared());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _inputFocus.requestFocus();
+    });
+  }
+
   void _submitSearch() {
     // Combine chips + any partial input text
     final allTags = [..._tagChips];
@@ -120,7 +178,11 @@ class _SearchScreenState extends State<SearchScreen>
     SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
     HapticFeedback.lightImpact();
     final bloc = context.read<SearchBloc>();
-    bloc.add(SearchSubmitted(query, bloc.state.activeSources));
+    if (query.isEmpty) {
+      bloc.add(SearchCleared());
+    } else {
+      bloc.add(SearchSubmitted(query, bloc.state.activeSources));
+    }
   }
 
   String get _fullQueryString {
@@ -146,10 +208,10 @@ class _SearchScreenState extends State<SearchScreen>
             // ─── Main scrollable content ──────────────────────────────────
             BlocBuilder<SearchBloc, SearchState>(
               builder: (context, state) {
-                // The floating glass search dock has fixed height; its tag
-                // chips scroll horizontally inside the input rather than
-                // growing over the results beneath it.
-                final headerHeight = topPad + 80;
+                // Reserve room for the separate, scrollable tag row without
+                // letting it overlap source filters or the results beneath.
+                final headerHeight =
+                    topPad + (_tagChips.isEmpty ? 80 : 120);
 
                 return CustomScrollView(
                   controller: _scrollController,
@@ -265,6 +327,7 @@ class _SearchScreenState extends State<SearchScreen>
             // ─── Floating search header ───────────────────────────────────
             _FloatingSearchHeader(
               tagChips: _tagChips,
+              chipScrollController: _chipScrollController,
               inputController: _inputController,
               inputFocus: _inputFocus,
               showSuggestions: _showSuggestions,
@@ -272,6 +335,7 @@ class _SearchScreenState extends State<SearchScreen>
               onTagAdded: _addTag,
               onSubmitted: (_) => _submitSearch(),
               onFilterTapped: () => _showFilterSheet(context),
+              onClear: _clearSearch,
               onSuggestionSelected: _addTag,
               onDismissSuggestions: () {
                 setState(() => _showSuggestions = false);
@@ -300,6 +364,7 @@ class _SearchScreenState extends State<SearchScreen>
 
 class _FloatingSearchHeader extends StatelessWidget {
   final List<String> tagChips;
+  final ScrollController chipScrollController;
   final TextEditingController inputController;
   final FocusNode inputFocus;
   final bool showSuggestions;
@@ -307,11 +372,13 @@ class _FloatingSearchHeader extends StatelessWidget {
   final ValueChanged<String> onTagAdded;
   final ValueChanged<String> onSubmitted;
   final VoidCallback onFilterTapped;
+  final VoidCallback onClear;
   final ValueChanged<String> onSuggestionSelected;
   final VoidCallback onDismissSuggestions;
 
   const _FloatingSearchHeader({
     required this.tagChips,
+    required this.chipScrollController,
     required this.inputController,
     required this.inputFocus,
     required this.showSuggestions,
@@ -319,6 +386,7 @@ class _FloatingSearchHeader extends StatelessWidget {
     required this.onTagAdded,
     required this.onSubmitted,
     required this.onFilterTapped,
+    required this.onClear,
     required this.onSuggestionSelected,
     required this.onDismissSuggestions,
   });
@@ -362,6 +430,7 @@ class _FloatingSearchHeader extends StatelessWidget {
                     Expanded(
                       child: _TagChipInput(
                         tagChips: tagChips,
+                        chipScrollController: chipScrollController,
                         inputController: inputController,
                         inputFocus: inputFocus,
                         onTagRemoved: onTagRemoved,
@@ -369,6 +438,20 @@ class _FloatingSearchHeader extends StatelessWidget {
                         onSubmitted: onSubmitted,
                       ),
                     ),
+                    if (tagChips.isNotEmpty || inputController.text.isNotEmpty)
+                      IconButton(
+                        tooltip: 'Clear search',
+                        visualDensity: VisualDensity.compact,
+                        constraints:
+                            const BoxConstraints.tightFor(width: 32, height: 40),
+                        padding: EdgeInsets.zero,
+                        onPressed: onClear,
+                        icon: Icon(
+                          Icons.close_rounded,
+                          size: 19,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     const SizedBox(width: 8),
                     _FilterButton(onTap: onFilterTapped),
                   ],
@@ -405,6 +488,7 @@ class _FloatingSearchHeader extends StatelessWidget {
 
 class _TagChipInput extends StatelessWidget {
   final List<String> tagChips;
+  final ScrollController chipScrollController;
   final TextEditingController inputController;
   final FocusNode inputFocus;
   final ValueChanged<String> onTagRemoved;
@@ -413,6 +497,7 @@ class _TagChipInput extends StatelessWidget {
 
   const _TagChipInput({
     required this.tagChips,
+    required this.chipScrollController,
     required this.inputController,
     required this.inputFocus,
     required this.onTagRemoved,
@@ -424,65 +509,70 @@ class _TagChipInput extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => inputFocus.requestFocus(),
-      child: SizedBox(
-        height: 52,
-        child: Row(
-          children: [
-            if (tagChips.isNotEmpty) ...[
-              Flexible(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (final tag in tagChips)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: _TagChip(
-                            tag: tag,
-                            onRemove: () => onTagRemoved(tag),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: 48,
+          child: TextField(
+            controller: inputController,
+            focusNode: inputFocus,
+            textAlignVertical: TextAlignVertical.center,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurface,
+              fontSize: 16,
+            ),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Search tags…',
+              hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                fontSize: 16,
               ),
-            ],
-            Expanded(
-              child: TextField(
-                controller: inputController,
-                focusNode: inputFocus,
-                textAlignVertical: TextAlignVertical.center,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                  fontSize: 16,
-                ),
-                decoration: InputDecoration(
-                  isDense: true,
-                  hintText: 'Search tags…',
-                  hintStyle: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
-                    fontSize: 16,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                ),
-                textInputAction: TextInputAction.search,
-                onSubmitted: onSubmitted,
-                // Space bar also adds tag
-                onChanged: (v) {
-                  if (v.endsWith(' ') && v.trim().isNotEmpty) {
-                    onTagAdded(v.trim());
-                  }
-                },
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+            ),
+            textInputAction: TextInputAction.search,
+            onSubmitted: onSubmitted,
+            // Space adds the completed word as a chip; Enter submits the query.
+            onChanged: (value) {
+              if (value.endsWith(' ') && value.trim().isNotEmpty) {
+                onTagAdded(value.trim());
+              }
+            },
+          ),
+        ),
+        if (tagChips.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          SizedBox(
+            height: 34,
+            child: SingleChildScrollView(
+              controller: chipScrollController,
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final tag in tagChips)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: _TagChip(
+                        tag: tag,
+                        onRemove: () => onTagRemoved(tag),
+                      ),
+                    ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -786,7 +876,7 @@ class _SourceChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive ? color.withOpacity(0.5) : theme.colorScheme.outline.withOpacity(0.15),
-            width: isActive ? 1.0 : 0.5,
+            width: isActive ? 1.2 : 0.9,
           ),
         ),
         child: Text(

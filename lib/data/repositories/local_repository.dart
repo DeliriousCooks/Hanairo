@@ -94,12 +94,25 @@ class LocalRepository {
   // ─── Favorite Tags ──────────────────────────────────────────────────────────
 
   List<String> getFavoriteTags() {
-    final raw = getSetting<String>('favorite_tags', '');
-    if (raw.isEmpty) return const [];
+    final raw = _settings.get('favorite_tags');
+    if (raw is List) {
+      return raw
+          .whereType<String>()
+          .map(_normalizeFavoriteTag)
+          .where((tag) => tag.isNotEmpty)
+          .toList();
+    }
+    if (raw is! String || raw.isEmpty) return <String>[];
     try {
-      return (jsonDecode(raw) as List).cast<String>();
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return <String>[];
+      return decoded
+          .whereType<String>()
+          .map(_normalizeFavoriteTag)
+          .where((tag) => tag.isNotEmpty)
+          .toList();
     } catch (_) {
-      return const [];
+      return <String>[];
     }
   }
 

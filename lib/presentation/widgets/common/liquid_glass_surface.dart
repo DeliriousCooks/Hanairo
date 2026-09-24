@@ -38,7 +38,7 @@ class LiquidGlassSurface extends StatelessWidget {
         : Colors.white.withOpacity(highContrast ? 0.92 : 0.78);
     final safeSigma = sigma.clamp(10.0, 24.0).toDouble();
 
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
         borderRadius: borderRadius,
         boxShadow: [
@@ -48,6 +48,12 @@ class LiquidGlassSurface extends StatelessWidget {
             offset: const Offset(0, 8),
           ),
         ],
+      ),
+      // Paint the edge after clipping the blurred fill. Keeping the stroke on
+      // this outer layer prevents the rounded corners from looking broken.
+      foregroundDecoration: BoxDecoration(
+        borderRadius: borderRadius,
+        border: Border.all(color: edge, width: highContrast ? 1.1 : 0.8),
       ),
       child: ClipRRect(
         borderRadius: borderRadius,
@@ -70,7 +76,6 @@ class LiquidGlassSurface extends StatelessWidget {
                         Colors.white.withOpacity(highContrast ? 0.08 : 0.22),
                       ],
               ),
-              border: Border.all(color: edge, width: highContrast ? 1.1 : 0.8),
             ),
             child: child,
           ),

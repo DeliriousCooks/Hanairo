@@ -1188,27 +1188,32 @@ class _FavoriteTagGesture extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final local = context.read<LocalRepository>();
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        HapticFeedback.lightImpact();
-        context.go('/search?q=${Uri.encodeQueryComponent(tag.name)}');
-      },
-      onLongPress: () async {
-        HapticFeedback.mediumImpact();
-        final wasSaved = local.isFavoriteTag(tag.name);
-        await local.toggleFavoriteTag(tag.name);
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(
-            content: Text(wasSaved
-                ? 'Removed ${tag.displayName} from favorite tags'
-                : 'Saved ${tag.displayName} to favorite tags'),
-            duration: const Duration(seconds: 1),
-          ));
-      },
-      child: child,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        customBorder: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          context.go('/search?q=${Uri.encodeQueryComponent(tag.name)}');
+        },
+        onLongPress: () async {
+          HapticFeedback.mediumImpact();
+          final wasSaved = local.isFavoriteTag(tag.name);
+          await local.toggleFavoriteTag(tag.name);
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(SnackBar(
+              content: Text(wasSaved
+                  ? 'Removed ${tag.displayName} from favorite tags'
+                  : 'Saved ${tag.displayName} to favorite tags'),
+              duration: const Duration(seconds: 1),
+            ));
+        },
+        child: child,
+      ),
     );
   }
 }

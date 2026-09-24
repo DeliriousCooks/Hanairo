@@ -310,9 +310,9 @@ class _BottomNav extends StatelessWidget {
           highContrast: true,
           borderRadius: BorderRadius.circular(27),
           child: SizedBox(
-            height: 84,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+             height: 76,
+             child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
               child: Row(
                 mainAxisSize: MainAxisSize.max,
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -375,14 +375,14 @@ class _NavItem extends StatelessWidget {
             child: AnimatedContainer(
               // Every selected tab gets the same compact footprint. This
               // prevents the highlight from filling its whole flex slot.
-              width: 68,
-              height: 64,
+              width: 62,
+              height: 56,
               alignment: Alignment.center,
               duration: const Duration(milliseconds: 190),
               curve: Curves.easeOutCubic,
               decoration: BoxDecoration(
                 color: selected ? activeBackground : Colors.transparent,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
                 border: selected
                     ? Border.all(color: color.withOpacity(isDark ? 0.22 : 0.18))
                     : null,
@@ -392,7 +392,7 @@ class _NavItem extends StatelessWidget {
                 children: [
                   Icon(
                     selected ? selectedIcon : icon,
-                    size: selected ? 22 : 21,
+                    size: selected ? 21 : 20,
                     color: selected
                         ? activeForeground
                         : theme.colorScheme.onSurface.withOpacity(0.82),
@@ -409,7 +409,7 @@ class _NavItem extends StatelessWidget {
                             ? activeForeground
                             : theme.colorScheme.onSurface.withOpacity(0.82),
                         fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                        fontSize: 10,
+                        fontSize: 9.5,
                       ),
                     ),
                   ),

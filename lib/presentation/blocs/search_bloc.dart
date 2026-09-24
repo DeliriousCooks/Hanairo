@@ -32,6 +32,8 @@ class SearchQueryChanged extends SearchEvent {
   List<Object?> get props => [query];
 }
 
+class SearchCleared extends SearchEvent {}
+
 class SearchSourceToggled extends SearchEvent {
   final BooruSource source;
   SearchSourceToggled(this.source);
@@ -63,6 +65,7 @@ class SearchState extends Equatable {
   final SearchStatus status;
   final List<Post> posts;
   final String tagString;
+  final String suggestionQuery;
   final List<BooruSource> activeSources;
   final ContentRating? ratingFilter;
   final int? minScore;
@@ -80,6 +83,7 @@ class SearchState extends Equatable {
     this.status = SearchStatus.initial,
     this.posts = const [],
     this.tagString = '',
+    this.suggestionQuery = '',
     this.activeSources = const [BooruSource.rule34xxx, BooruSource.e621],
     this.ratingFilter,
     this.minScore,
@@ -106,6 +110,7 @@ class SearchState extends Equatable {
     SearchStatus? status,
     List<Post>? posts,
     String? tagString,
+    String? suggestionQuery,
     List<BooruSource>? activeSources,
     ContentRating? ratingFilter,
     bool clearRatingFilter = false,
@@ -129,6 +134,7 @@ class SearchState extends Equatable {
       status: status ?? this.status,
       posts: posts ?? this.posts,
       tagString: tagString ?? this.tagString,
+      suggestionQuery: suggestionQuery ?? this.suggestionQuery,
       activeSources: activeSources ?? this.activeSources,
       ratingFilter: clearRatingFilter ? null : (ratingFilter ?? this.ratingFilter),
       minScore: clearMinScore ? null : (minScore ?? this.minScore),
@@ -166,6 +172,7 @@ class SearchState extends Equatable {
         status,
         posts,
         tagString,
+        suggestionQuery,
         activeSources,
         ratingFilter,
         minScore,
@@ -187,6 +194,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
   final SearchRepository _searchRepo;
   final LocalRepository _localRepo;
   Timer? _suggestionTimer;
+  int _searchGeneration = 0;
 
   SearchBloc({
     required SearchRepository searchRepo,
@@ -214,6 +222,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     on<SearchQueryChanged>(_onQueryChanged,
         transformer: (events, mapper) =>
             events.debounceTime(const Duration(milliseconds: 300)).switchMap(mapper));
+    on<SearchCleared>(_onSearchCleared);
     on<SearchSourceToggled>(_onSourceToggled);
     on<SearchFilterChanged>(_onFilterChanged);
     on<PostFavoriteToggled>(_onFavoriteToggled);
@@ -223,9 +232,11 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     SearchSubmitted event,
     Emitter<SearchState> emit,
   ) async {
+    final requestGeneration = ++_searchGeneration;
     emit(state.copyWith(
       status: SearchStatus.loading,
       tagString: event.tagString,
+      suggestionQuery: '',
       activeSources: event.sources,
       posts: [],
       pageBySource: {for (final s in event.sources) s: 0},
@@ -238,14 +249,15 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       clearTagCounts: true,
     ));
 
-    // Save to history
-    if (event.tagString.trim().isNotEmpty) {
-      await _localRepo.addSearchHistory(event.tagString.trim());
-    }
-
+    final query = state.currentQuery;
     try {
-      final query = state.currentQuery;
+      if (event.tagString.trim().isNotEmpty) {
+        await _localRepo.addSearchHistory(event.tagString.trim());
+      }
+      if (emit.isDone || requestGeneration != _searchGeneration) return;
+
       final perSource = await _searchRepo.searchPerSourceDetailed(query);
+      if (emit.isDone || requestGeneration != _searchGeneration) return;
       final merged = perSource.values.expand((r) => r.posts).toList();
       if (query.sources.length > 1) {
         merged.sort((a, b) => b.score.compareTo(a.score));
@@ -281,11 +293,14 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
           tagParts.single,
           query.sources,
         );
-        if (!emit.isDone && state.tagString == event.tagString) {
+        if (!emit.isDone &&
+            requestGeneration == _searchGeneration &&
+            state.tagString == event.tagString) {
           emit(state.copyWith(tagCounts: counts));
         }
       }
     } catch (e) {
+      if (emit.isDone || requestGeneration != _searchGeneration) return;
       emit(state.copyWith(
         status: SearchStatus.failure,
         errorMessage: 'Search failed. Check your connection.',
@@ -298,6 +313,8 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     Emitter<SearchState> emit,
   ) async {
     if (state.status == SearchStatus.loadingMore || !state.hasMore) return;
+
+    final requestedGeneration = _searchGeneration;
 
     // Only fetch the next page from sources that haven't run out yet -
     // each source paginates on its own, independent page number.
@@ -322,6 +339,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
         final posts = await _searchRepo.sourceFor(source).search(query);
         return MapEntry(source, posts);
       }));
+      if (emit.isDone || requestedGeneration != _searchGeneration) return;
 
       final newPosts = results.expand((e) => e.value).toList();
       final deduped = _dedupeAgainst(state.posts, newPosts);
@@ -345,6 +363,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
         hasMoreBySource: updatedHasMoreBySource,
       ));
     } catch (e) {
+      if (emit.isDone || requestedGeneration != _searchGeneration) return;
       emit(state.copyWith(
         status: SearchStatus.failure,
         errorMessage: 'Failed to load more posts.',
@@ -360,15 +379,26 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     add(SearchSubmitted(state.tagString, state.activeSources));
   }
 
+  void _onSearchCleared(SearchCleared event, Emitter<SearchState> emit) {
+    _searchGeneration++;
+    // Keep the user's chosen sources and filters, but remove stale results so
+    // clearing the query returns Search to its clean, empty state.
+    emit(SearchState(
+      activeSources: state.activeSources,
+      ratingFilter: state.ratingFilter,
+      minScore: state.minScore,
+      fileTypeFilter: state.fileTypeFilter,
+    ));
+  }
+
   Future<void> _onQueryChanged(
     SearchQueryChanged event,
     Emitter<SearchState> emit,
   ) async {
     final query = event.query;
     emit(state.copyWith(
-      tagString: query,
+      suggestionQuery: query,
       tagSuggestions: const [],
-      clearTagCounts: true,
       clearTagSuggestionCounts: true,
     ));
 
@@ -394,7 +424,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
         lastTag,
         state.activeSources,
       );
-      if (emit.isDone || state.tagString != query) return;
+      if (emit.isDone || state.suggestionQuery != query) return;
       emit(state.copyWith(
         tagSuggestions: suggestions.take(5).toList(),
         clearTagSuggestionCounts: true,
@@ -418,7 +448,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
           }
         }),
       );
-      if (!emit.isDone && state.tagString == query) {
+      if (!emit.isDone && state.suggestionQuery == query) {
         emit(state.copyWith(
           tagSuggestionCounts: Map.fromEntries(
             countResults.whereType<MapEntry<String, int>>(),
@@ -426,7 +456,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
         ));
       }
     } catch (e) {
-      if (!emit.isDone && state.tagString == query) {
+      if (!emit.isDone && state.suggestionQuery == query) {
         emit(state.copyWith(
           tagSuggestions: [],
           clearTagSuggestionCounts: true,

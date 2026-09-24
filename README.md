@@ -1,4 +1,17 @@
-# BooruWave UI update v14
+# BooruWave UI update v15
+
+This is the v15 source overlay, based on v14. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
+
+## v15 finishing fixes
+
+- Put selected search tags on their own horizontally scrollable row, auto-scroll to the newest tag, and keep the plain text entry borderless so its hint can never cover the chips.
+- Added a clear-search control that removes all chips and text and returns Search to its empty state while preserving source and filter choices; in-flight results can no longer repopulate a cleared search.
+- Kept autocomplete text separate from the submitted search query so pending suggestions can't corrupt result counts or interrupt a search after Enter.
+- Fixed favorite-tag persistence when the list is empty (the previous empty-list value was immutable, so the first favorite could not be inserted). Added compatibility for older list-shaped stored values and made tag tap/hold use a Material ink gesture.
+- Painted the glass edge above the clipped blur so rounded borders stay continuous, strengthened the compact search source-chip outlines, and reduced the bottom dock and selected-tab footprint.
+- Updated Search when a tag link changes the route while Search is already open.
+
+The original v14 notes follow.
 
 This is a source overlay for the existing Flutter app. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
 
