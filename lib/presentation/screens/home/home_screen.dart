@@ -324,7 +324,7 @@ class _SourceChip extends StatelessWidget {
   Color get _color {
     switch (source) {
       case BooruSource.rule34xxx:
-        return const Color(0xFF7C6FFF);
+        return const Color(0xFFA180FF);
       case BooruSource.e621:
         return const Color(0xFF4ECDC4);
       case BooruSource.gelbooru:

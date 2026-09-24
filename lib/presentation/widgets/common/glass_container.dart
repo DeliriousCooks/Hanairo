@@ -49,10 +49,19 @@ class GlassContainer extends StatelessWidget {
                 Colors.white.withOpacity(0.0),
               ],
             ),
+            // Fine lavender border with a quiet accent-tinted glow, per the
+            // BooruWave mockup's frosted-glass panels.
             border: Border.all(
-              color: Colors.white.withOpacity(0.14),
+              color: const Color(0xFFB4A1FF).withOpacity(0.22),
               width: 0.75,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFA180FF).withOpacity(0.08),
+                blurRadius: 24,
+                spreadRadius: -6,
+              ),
+            ],
           ),
           child: child,
         ),

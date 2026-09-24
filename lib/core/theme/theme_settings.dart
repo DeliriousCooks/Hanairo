@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 
 /// The 8 selectable accent colors shown as swatches in Settings.
 enum AccentColor {
-  violet(Color(0xFF7C6FFF), 'Violet'),
+  violet(Color(0xFFA180FF), 'Amethyst'),
   magenta(Color(0xFFB56FFF), 'Magenta'),
-  blue(Color(0xFF4F9DFF), 'Blue'),
+  blue(Color(0xFF66A9FF), 'Blue'),
   teal(Color(0xFF4ECDC4), 'Teal'),
   green(Color(0xFF6FCF7A), 'Green'),
   orange(Color(0xFFFF9D4F), 'Orange'),
   red(Color(0xFFFF6F6F), 'Red'),
-  pink(Color(0xFFFF7CB0), 'Pink');
+  pink(Color(0xFFE995D2), 'Pink');
 
   final Color color;
   final String label;
@@ -51,19 +51,19 @@ enum ThemePreset {
   defaultPreset(
     label: 'Default',
     suggestedAccent: AccentColor.violet,
-    gradientDark: [Color(0xFF0A0A0F), Color(0xFF15121F)],
+    gradientDark: [Color(0xFF130E29), Color(0xFF080B17)],
     gradientLight: [Color(0xFFF5F5FA), Color(0xFFECEAF7)],
   ),
   amethyst(
     label: 'Amethyst',
     suggestedAccent: AccentColor.magenta,
-    gradientDark: [Color(0xFF130A1F), Color(0xFF241432)],
+    gradientDark: [Color(0xFF1B1033), Color(0xFF0D0820)],
     gradientLight: [Color(0xFFF6EEFB), Color(0xFFE9D9F5)],
   ),
   ocean(
     label: 'Ocean',
     suggestedAccent: AccentColor.blue,
-    gradientDark: [Color(0xFF06131F), Color(0xFF0C2436)],
+    gradientDark: [Color(0xFF081C33), Color(0xFF06111F)],
     gradientLight: [Color(0xFFEAF5FC), Color(0xFFD6EAF7)],
   ),
   sunset(
