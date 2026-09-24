@@ -2,26 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class AppColors {
-  // Dark Mode Palette (default) - deep navy, per the BooruWave mockup
-  static const darkBackground = Color(0xFF080B17);
-  static const darkSurface = Color(0xFF111629);
-  static const darkCard = Color(0xFF171D35);
-  static const darkCardElevated = Color(0xFF1D2440);
-  static const darkBorder = Color(0xFF293452);
-  static const darkDivider = Color(0xFF1C2338);
+  // Dark Mode Palette (default)
+  static const darkBackground = Color(0xFF0A0A0F);
+  static const darkSurface = Color(0xFF12121A);
+  static const darkCard = Color(0xFF1A1A26);
+  static const darkCardElevated = Color(0xFF22223A);
+  static const darkBorder = Color(0xFF2A2A40);
+  static const darkDivider = Color(0xFF1E1E2E);
 
-  // Primary Accent - Amethyst
-  static const primary = Color(0xFFA180FF);
-  static const primaryLight = Color(0xFFC1A8FF);
-  static const primaryDark = Color(0xFF7B5CDB);
-  static const primaryContainer = Color(0xFF241C4A);
+  // Primary Accent - Deep Violet
+  static const primary = Color(0xFF7C6FFF);
+  static const primaryLight = Color(0xFF9B90FF);
+  static const primaryDark = Color(0xFF5A4FCC);
+  static const primaryContainer = Color(0xFF2A2550);
 
-  // Secondary - Amethyst-to-blue accent
-  static const secondary = Color(0xFF66A9FF);
-  static const secondaryContainer = Color(0xFF16233F);
-
-  // Restrained pink highlight (favorites, "pro" accents)
-  static const pinkHighlight = Color(0xFFE995D2);
+  // Secondary - Teal
+  static const secondary = Color(0xFF4ECDC4);
+  static const secondaryContainer = Color(0xFF1A3535);
 
   // Status Colors
   static const success = Color(0xFF4CAF50);
@@ -35,18 +32,18 @@ class AppColors {
   static const ratingExplicit = Color(0xFFFF5252);
 
   // Text
-  static const textPrimary = Color(0xFFF5F3FF);
-  static const textSecondary = Color(0xFFA1A8C4);
-  static const textTertiary = Color(0xFF6F7897);
+  static const textPrimary = Color(0xFFF0F0FF);
+  static const textSecondary = Color(0xFFAAAAAE);
+  static const textTertiary = Color(0xFF6B6B80);
   static const textDisabled = Color(0xFF3A3A50);
 
   // Light Mode Palette
-  static const lightBackground = Color(0xFFEEEFF9);
+  static const lightBackground = Color(0xFFF5F5FA);
   static const lightSurface = Color(0xFFFFFFFF);
-  static const lightCard = Color(0xFFEAEBF7);
-  static const lightBorder = Color(0xFFD5D7EB);
-  static const lightTextPrimary = Color(0xFF24243B);
-  static const lightTextSecondary = Color(0xFF6F7390);
+  static const lightCard = Color(0xFFF0F0F8);
+  static const lightBorder = Color(0xFFE0E0F0);
+  static const lightTextPrimary = Color(0xFF0A0A1A);
+  static const lightTextSecondary = Color(0xFF4A4A6A);
 }
 
 class AppTextStyles {
@@ -158,12 +155,6 @@ class AppTextStyles {
 }
 
 class AppTheme {
-  /// The amethyst-to-blue-to-pink accent gradient used for hero headings and
-  /// other signature moments, matching the BooruWave mockup's brand gradient.
-  static const accentGradient = LinearGradient(
-    colors: [Color(0xFFAE98FF), Color(0xFF80B5FF), Color(0xFFEC9FD8)],
-  );
-
   /// Lightens or darkens [color] by [amount] (-1..1) in HSL lightness space.
   static Color _adjustLightness(Color color, double amount) {
     final hsl = HSLColor.fromColor(color);
@@ -329,15 +320,13 @@ class AppTheme {
       ),
       extensions: [
         AppThemeExtension(
-          shimmerBase: const Color(0xFF171D35),
-          shimmerHighlight: const Color(0xFF293452),
-          // Matches the mockup's --glass: rgba(25,31,56,.82)
-          glassBackground: const Color(0xD1191F38),
-          // Fine lavender border, à la mockup's --line: #293452
-          glassBorder: const Color(0x66565F8A),
+          shimmerBase: const Color(0xFF1A1A26),
+          shimmerHighlight: const Color(0xFF2A2A40),
+          glassBackground: const Color(0x801A1A26),
+          glassBorder: const Color(0x402A2A40),
           tagColors: {
             'general': const Color(0xFF7C8FFF),
-            'artist': AppColors.pinkHighlight,
+            'artist': const Color(0xFFFF7CA0),
             'copyright': const Color(0xFFCC7CFF),
             'character': const Color(0xFF7CFFCC),
             'meta': const Color(0xFFFFCC7C),
@@ -375,11 +364,11 @@ class AppTheme {
         AppThemeExtension(
           shimmerBase: const Color(0xFFE8E8F0),
           shimmerHighlight: const Color(0xFFF5F5FA),
-          glassBackground: const Color(0xD9F6F7FF),
-          glassBorder: const Color(0x40D5D7EB),
+          glassBackground: const Color(0x80FFFFFF),
+          glassBorder: const Color(0x40E0E0F0),
           tagColors: {
             'general': const Color(0xFF5C6FDF),
-            'artist': const Color(0xFFDF5C9B),
+            'artist': const Color(0xFFDF5C80),
             'copyright': const Color(0xFFAC5CDF),
             'character': const Color(0xFF5CDFAC),
             'meta': const Color(0xFFDFAC5C),

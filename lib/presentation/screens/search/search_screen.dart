@@ -192,9 +192,13 @@ class _SearchScreenState extends State<SearchScreen>
                         // unrelated state updates like loadingMore status)
                         key: ValueKey(state.posts.length),
                         posts: state.posts,
-                        columns:
-                            context.read<LocalRepository>().getGridColumns(),
-                        onPostTapped: (post, index) {
+                          columns: context
+                              .read<LocalRepository>()
+                              .getGridColumns(),
+                          onFavoriteTapped: (post) => context
+                              .read<SearchBloc>()
+                              .add(PostFavoriteToggled(post)),
+                          onPostTapped: (post, index) {
                           context.push('/viewer', extra: {
                             'posts': state.posts,
                             'index': index,

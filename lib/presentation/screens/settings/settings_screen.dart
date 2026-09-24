@@ -80,7 +80,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ? Icons.dark_mode_rounded
                       : Icons.light_mode_rounded,
                   color: themeController.isDark
-                      ? const Color(0xFFA180FF)
+                      ? const Color(0xFF7C6FFF)
                       : const Color(0xFFFFCC7C),
                 ),
                 trailing: Switch(

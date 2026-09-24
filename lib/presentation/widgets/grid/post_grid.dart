@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../data/repositories/local_repository.dart';
 import '../../../domain/entities/post.dart';
 
 class PostGridSliver extends StatelessWidget {
   final List<Post> posts;
   final void Function(Post post, int index) onPostTapped;
   final int columns;
+  final ValueChanged<Post>? onFavoriteTapped;
 
   const PostGridSliver({
     super.key,
     required this.posts,
     required this.onPostTapped,
     this.columns = 3,
+    this.onFavoriteTapped,
   });
 
   @override
@@ -36,6 +40,9 @@ class PostGridSliver extends StatelessWidget {
               key: ValueKey('${post.source.name}_${post.id}'),
               post: post,
               onTap: () => onPostTapped(post, index),
+              onFavoriteTapped: onFavoriteTapped == null
+                  ? null
+                  : () => onFavoriteTapped!(post),
             );
           },
           childCount: posts.length,
@@ -50,11 +57,13 @@ class PostGridSliver extends StatelessWidget {
 class PostTile extends StatefulWidget {
   final Post post;
   final VoidCallback onTap;
+  final VoidCallback? onFavoriteTapped;
 
   const PostTile({
     super.key,
     required this.post,
     required this.onTap,
+    this.onFavoriteTapped,
   });
 
   @override
@@ -89,6 +98,7 @@ class _PostTileState extends State<PostTile>
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>();
     final post = widget.post;
+    final isFavorite = context.read<LocalRepository>().isFavorite(post.uniqueId);
 
     return GestureDetector(
       onTapDown: (_) {
@@ -107,7 +117,7 @@ class _PostTileState extends State<PostTile>
           child: child,
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(14),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -128,9 +138,33 @@ class _PostTileState extends State<PostTile>
               // ─── Media type badge ────────────────────────────────────────
               if (post.isVideo || post.isGif)
                 Positioned(
-                  top: 6,
+                  top: widget.onFavoriteTapped != null ? 42 : 6,
                   right: 6,
                   child: _MediaTypeBadge(post: post),
+                ),
+
+              if (widget.onFavoriteTapped != null)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Material(
+                    color: Colors.black.withOpacity(0.42),
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: widget.onFavoriteTapped,
+                      child: Padding(
+                        padding: const EdgeInsets.all(7),
+                        child: Icon(
+                          isFavorite
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          size: 17,
+                          color: isFavorite ? const Color(0xFFFF82B2) : Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
 
               // ─── Source badge ────────────────────────────────────────────
@@ -211,8 +245,33 @@ class _PostOverlay extends StatelessWidget {
         ),
       ),
       padding: const EdgeInsets.fromLTRB(6, 12, 6, 6),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (post.tags.isNotEmpty) ...[
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: post.tags.take(2).map((tag) => Container(
+                constraints: const BoxConstraints(maxWidth: 96),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.16),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  tag.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 9, color: Colors.white),
+                ),
+              )).toList(),
+            ),
+            const SizedBox(height: 5),
+          ],
+          Row(
+            children: [
           // Score
           if (post.score != 0) ...[
             Icon(
@@ -236,6 +295,8 @@ class _PostOverlay extends StatelessWidget {
             const Spacer(),
           // Rating dot
           _RatingDot(rating: post.rating),
+            ],
+          ),
         ],
       ),
     );

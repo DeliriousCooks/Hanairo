@@ -11,9 +11,11 @@ import 'data/repositories/search_repository.dart';
 import 'data/repositories/local_repository.dart';
 import 'presentation/blocs/search_bloc.dart';
 import 'presentation/screens/home/home_screen.dart';
+import 'presentation/screens/home/feed_screen.dart';
 import 'presentation/screens/search/search_screen.dart';
 import 'presentation/screens/viewer/viewer_screen.dart';
 import 'presentation/screens/favorites/favorites_screen.dart';
+import 'presentation/screens/account/account_screen.dart';
 import 'presentation/screens/settings/settings_screen.dart';
 import 'presentation/screens/auth/auth_screen.dart';
 import 'domain/entities/post.dart';
@@ -61,7 +63,7 @@ final _router = GoRouter(
         GoRoute(
           path: '/',
           pageBuilder: (context, state) => const NoTransitionPage(
-            child: HomeScreen(),
+            child: FeedScreen(),
           ),
         ),
         GoRoute(
@@ -77,6 +79,12 @@ final _router = GoRouter(
           path: '/favorites',
           pageBuilder: (context, state) => const NoTransitionPage(
             child: FavoritesScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/account',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: AccountScreen(),
           ),
         ),
         GoRoute(
@@ -185,7 +193,7 @@ class MainShell extends StatelessWidget {
   final Widget child;
   const MainShell({super.key, required this.child});
 
-  static const _routes = ['/', '/search', '/favorites', '/settings'];
+  static const _routes = ['/', '/search', '/favorites', '/account', '/settings'];
 
   int _indexForLocation(BuildContext context) {
     // FIX: Use full path comparison and handle sub-paths correctly.
@@ -246,9 +254,10 @@ class _BottomNav extends StatelessWidget {
   });
 
   static const _items = [
-    (icon: Icons.home_outlined, selectedIcon: Icons.home_rounded, label: 'Home'),
+    (icon: Icons.home_outlined, selectedIcon: Icons.home_rounded, label: 'Feed'),
     (icon: Icons.search_outlined, selectedIcon: Icons.search_rounded, label: 'Search'),
     (icon: Icons.favorite_outline_rounded, selectedIcon: Icons.favorite_rounded, label: 'Favorites'),
+    (icon: Icons.person_outline_rounded, selectedIcon: Icons.person_rounded, label: 'Account'),
     (icon: Icons.settings_outlined, selectedIcon: Icons.settings_rounded, label: 'Settings'),
   ];
 
