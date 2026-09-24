@@ -442,11 +442,13 @@ class _SingleFeedMediaState extends State<_SingleFeedMedia> {
     if (mediaObject is! RenderBox || !mediaObject.attached) return false;
 
     final viewportObject = RenderAbstractViewport.of(mediaObject);
-    if (viewportObject is! RenderBox || !viewportObject.attached) return false;
+    if (!viewportObject.attached) return false;
 
     final mediaRect = mediaObject.localToGlobal(Offset.zero) & mediaObject.size;
-    final viewportRect =
-        viewportObject.localToGlobal(Offset.zero) & viewportObject.size;
+    final viewportRect = MatrixUtils.transformRect(
+      viewportObject.getTransformTo(null),
+      viewportObject.paintBounds,
+    );
     // The floating bottom tabs sit over the scroll view; don't count the
     // covered portion as visible when deciding whether this video may play.
     final coveredBottom = MediaQuery.paddingOf(context).bottom + 100;
