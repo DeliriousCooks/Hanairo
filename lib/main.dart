@@ -10,7 +10,6 @@ import 'presentation/widgets/common/glass_container.dart';
 import 'data/repositories/search_repository.dart';
 import 'data/repositories/local_repository.dart';
 import 'presentation/blocs/search_bloc.dart';
-import 'presentation/screens/home/home_screen.dart';
 import 'presentation/screens/home/feed_screen.dart';
 import 'presentation/screens/search/search_screen.dart';
 import 'presentation/screens/viewer/viewer_screen.dart';
@@ -223,19 +222,18 @@ class MainShell extends StatelessWidget {
           extendBody: true,
           extendBodyBehindAppBar: true,
           body: child,
-          bottomNavigationBar: _BottomNav(
-            selectedIndex: _indexForLocation(context),
-            glass: themeController.glass,
-            onDestinationSelected: (index) {
-              // FIX: Only navigate if we're not already on this route
-              // to prevent unnecessary rebuilds.
-              final current = GoRouterState.of(context).uri.path;
-              final target = _routes[index];
-              if (current != target) {
-                context.go(target);
-              }
-            },
-          ),
+          resizeToAvoidBottomInset: true,
+          bottomNavigationBar: MediaQuery.of(context).viewInsets.bottom > 0
+              ? null
+              : _BottomNav(
+                  selectedIndex: _indexForLocation(context),
+                  glass: themeController.glass,
+                  onDestinationSelected: (index) {
+                    final current = GoRouterState.of(context).uri.path;
+                    final target = _routes[index];
+                    if (current != target) context.go(target);
+                  },
+                ),
         );
       },
     );

@@ -10,6 +10,7 @@ abstract class BooruDataSource {
   Future<List<Post>> search(SearchQuery query);
   Future<Post?> getPost(String id);
   Future<List<String>> getTagSuggestions(String prefix);
+  Future<int?> getTagCount(String tag);
   Future<bool> login(String username, String credential);
   Future<bool> addFavorite(String postId);
   Future<bool> removeFavorite(String postId);
@@ -134,6 +135,23 @@ class Rule34xxxDataSource implements BooruDataSource {
     } catch (e) {
       return [];
     }
+  }
+
+  @override
+  Future<int?> getTagCount(String tag) async {
+    try {
+      final response = await _dio.get('/index.php', queryParameters: {
+        'page': 'dapi', 's': 'tag', 'q': 'index',
+        'name_pattern': canonicalizeTag(tag), 'limit': 20, 'json': 1,
+      });
+      final rows = response.data is List ? response.data as List : [response.data];
+      for (final row in rows) {
+        if (row is Map && row['name'] == canonicalizeTag(tag)) {
+          return _toInt(row['count']);
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   @override
@@ -314,6 +332,23 @@ class E621DataSource implements BooruDataSource {
   }
 
   @override
+  Future<int?> getTagCount(String tag) async {
+    try {
+      _setAuth();
+      final response = await _dio.get('/tags.json', queryParameters: {
+        'search[name_matches]': '${canonicalizeTag(tag)}*', 'limit': 20,
+      });
+      final rows = response.data as List<dynamic>? ?? [];
+      for (final row in rows) {
+        if (row is Map && row['name'] == canonicalizeTag(tag)) {
+          return _toInt(row['post_count']);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  @override
   Future<Post?> getPost(String id) async {
     try {
       _setAuth();
@@ -483,6 +518,24 @@ class GelbooruDataSource implements BooruDataSource {
   }
 
   @override
+  Future<int?> getTagCount(String tag) async {
+    try {
+      final response = await _dio.get('/index.php', queryParameters: {
+        'page': 'dapi', 's': 'tag', 'q': 'index',
+        'name_pattern': canonicalizeTag(tag), 'limit': 20, 'json': 1,
+      });
+      final body = response.data;
+      final rows = body is Map ? (body['tag'] as List<dynamic>? ?? []) : <dynamic>[];
+      for (final row in rows) {
+        if (row is Map && row['name'] == canonicalizeTag(tag)) {
+          return _toInt(row['count']);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  @override
   Future<Post?> getPost(String id) async {
     try {
       final response = await _dio.get('/index.php', queryParameters: {
@@ -597,6 +650,23 @@ class PahealDataSource implements BooruDataSource {
     } catch (e) {
       return [];
     }
+  }
+
+  @override
+  Future<int?> getTagCount(String tag) async {
+    try {
+      final response = await _dio.get('/api/danbooru/find_tags/index.xml',
+          queryParameters: {'name': canonicalizeTag(tag), 'limit': 20});
+      final xmlStr = response.data as String? ?? '';
+      if (xmlStr.isEmpty) return null;
+      final doc = XmlDocument.parse(xmlStr);
+      for (final element in doc.findAllElements('tag')) {
+        if (element.getAttribute('name') == canonicalizeTag(tag)) {
+          return int.tryParse(element.getAttribute('count') ?? '');
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   @override

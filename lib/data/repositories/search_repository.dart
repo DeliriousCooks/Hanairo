@@ -2,6 +2,7 @@ import 'dart:async';
 import '../../domain/entities/post.dart';
 import '../datasources/booru_api.dart';
 import '../../core/utils/logger.dart';
+import '../../core/tags/tag_translator.dart';
 
 class SourceResult {
   final List<Post> posts;
@@ -93,6 +94,23 @@ class SearchRepository {
     }
 
     return merged.take(30).toList();
+  }
+
+  /// Fetches each selected site's count for one exact tag. Counts are omitted
+  /// when a site does not return an exact match or its tag endpoint is down.
+  Future<Map<BooruSource, int>> getTagCounts(
+    String tag,
+    List<BooruSource> sources,
+  ) async {
+    final results = await Future.wait(sources.map((source) async {
+      final translated = TagTranslator.translate([tag], source);
+      if (translated.isEmpty) return null;
+      final count = await _sources[source]
+          ?.getTagCount(translated.single)
+          .timeout(const Duration(seconds: 8), onTimeout: () => null);
+      return count == null ? null : MapEntry(source, count);
+    }));
+    return Map.fromEntries(results.whereType<MapEntry<BooruSource, int>>());
   }
 
   Future<bool> login(BooruSource source, String username, String credential) {

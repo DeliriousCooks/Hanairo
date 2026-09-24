@@ -33,6 +33,8 @@ class TagTranslator {
       // e621 prefers "anthro" as the umbrella term some other sites tag
       // as "furry" for the species-general case.
       'furry': 'anthro',
+      // The broader Rule34.xxx tag is indexed as big_penis on e621.
+      'huge_penis': 'big_penis',
       'porn': 'explicit',
     },
     BooruSource.rule34xxx: {

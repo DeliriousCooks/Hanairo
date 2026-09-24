@@ -10,6 +10,7 @@ import '../../widgets/grid/post_grid.dart';
 import '../../widgets/search/filter_sheet.dart';
 import '../../widgets/common/page_background.dart';
 import '../../../data/repositories/local_repository.dart';
+import '../../../core/tags/tag_translator.dart';
 
 class SearchScreen extends StatefulWidget {
   final String initialQuery;
@@ -133,6 +134,9 @@ class _SearchScreenState extends State<SearchScreen>
     return PageBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        // The shell scaffold handles the keyboard inset. Resizing this nested
+        // scaffold as well double-applies the inset and leaves a dead strip.
+        resizeToAvoidBottomInset: false,
         body: Stack(
           children: [
             // ─── Main scrollable content ──────────────────────────────────
@@ -160,6 +164,10 @@ class _SearchScreenState extends State<SearchScreen>
                     SliverToBoxAdapter(
                       child: _SourceChips(state: state),
                     ),
+                    if (state.tagString.trim().isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: _TranslatedQueries(state: state),
+                      ),
 
                     // Results header with real count
                     if (state.status == SearchStatus.success ||
@@ -739,6 +747,9 @@ class _ResultsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final countSummary = state.tagCounts.entries
+        .map((entry) => '${entry.key.shortName} ${_formatTagCount(entry.value)}')
+        .join('  ·  ');
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
       child: Column(
@@ -746,10 +757,6 @@ class _ResultsHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              // Accurate count display
-              // hasMore=true → at least one source has more pages;
-              // show "N+ results" to signal this is not the final total.
-              // hasMore=false → all sources are exhausted; show exact count.
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -757,9 +764,7 @@ class _ResultsHeader extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  state.hasMore
-                      ? '${state.posts.length}+ loaded'
-                      : '${state.posts.length} result${state.posts.length == 1 ? '' : 's'}',
+                  '${state.posts.length} results loaded',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
@@ -779,6 +784,16 @@ class _ResultsHeader extends StatelessWidget {
                 ),
             ],
           ),
+          if (state.tagCounts.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 7),
+              child: Text(
+                'Tag posts  ·  $countSummary',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withOpacity(0.78),
+                ),
+              ),
+            ),
           if (state.failedSources.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -809,6 +824,47 @@ class _ResultsHeader extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+String _formatTagCount(int count) {
+  if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}m';
+  if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}k';
+  return count.toString();
+}
+
+class _TranslatedQueries extends StatelessWidget {
+  final SearchState state;
+  const _TranslatedQueries({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final tags = state.tagString.trim().split(RegExp(r'\s+'));
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 5,
+        children: state.activeSources.map((source) {
+          final translated = TagTranslator.translateForSource(tags, source);
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.16)),
+            ),
+            child: Text(
+              '${source.shortName} · ${translated.isEmpty ? 'no matching tags' : translated}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

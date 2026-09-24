@@ -72,6 +72,7 @@ class SearchState extends Equatable {
   final List<BooruSource> failedSources;
   final String? errorMessage;
   final List<String> tagSuggestions;
+  final Map<BooruSource, int> tagCounts;
 
   const SearchState({
     this.status = SearchStatus.initial,
@@ -86,6 +87,7 @@ class SearchState extends Equatable {
     this.failedSources = const [],
     this.errorMessage,
     this.tagSuggestions = const [],
+    this.tagCounts = const {},
   });
 
   /// True if at least one active source might still have more results to
@@ -113,6 +115,8 @@ class SearchState extends Equatable {
     String? errorMessage,
     bool clearError = false,
     List<String>? tagSuggestions,
+    Map<BooruSource, int>? tagCounts,
+    bool clearTagCounts = false,
   }) {
     return SearchState(
       status: status ?? this.status,
@@ -127,6 +131,7 @@ class SearchState extends Equatable {
       failedSources: failedSources ?? this.failedSources,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       tagSuggestions: tagSuggestions ?? this.tagSuggestions,
+      tagCounts: clearTagCounts ? const {} : (tagCounts ?? this.tagCounts),
     );
   }
 
@@ -159,6 +164,7 @@ class SearchState extends Equatable {
         failedSources,
         errorMessage,
         tagSuggestions,
+        tagCounts,
       ];
 }
 
@@ -214,6 +220,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       failedSources: const [],
       clearError: true,
       tagSuggestions: [],
+      clearTagCounts: true,
     ));
 
     // Save to history
@@ -246,6 +253,17 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
         },
         failedSources: failed,
       ));
+
+      final tagParts = query.tags;
+      if (tagParts.length == 1) {
+        final counts = await _searchRepo.getTagCounts(
+          tagParts.single,
+          query.sources,
+        );
+        if (!emit.isDone && state.tagString == event.tagString) {
+          emit(state.copyWith(tagCounts: counts));
+        }
+      }
     } catch (e) {
       emit(state.copyWith(
         status: SearchStatus.failure,
@@ -326,7 +344,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     Emitter<SearchState> emit,
   ) async {
     final query = event.query;
-    emit(state.copyWith(tagString: query));
+    emit(state.copyWith(tagString: query, clearTagCounts: true));
 
     if (query.isEmpty || query.endsWith(' ')) {
       emit(state.copyWith(tagSuggestions: []));

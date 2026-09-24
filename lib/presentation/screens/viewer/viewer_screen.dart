@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:photo_view/photo_view.dart';
-import 'package:photo_view/photo_view_gallery.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
@@ -38,13 +36,10 @@ class _ViewerScreenState extends State<ViewerScreen>
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex.clamp(0, widget.posts.length - 1);
+    _currentIndex = widget.posts.isEmpty
+        ? 0
+        : widget.initialIndex.clamp(0, widget.posts.length - 1);
 
-    // CRITICAL FIX: PageController must be created synchronously before the
-    // widget tree builds. Creating it in a callback or with a delay caused
-    // the PhotoViewGallery to render before the controller attached, which
-    // left the page at index 0 regardless of initialIndex — when index 0
-    // had a null/bad URL this produced the grey screen bug.
     _pageController = PageController(
       initialPage: _currentIndex,
       keepPage: false, // don't keep stale page offset across rebuilds
@@ -71,7 +66,7 @@ class _ViewerScreenState extends State<ViewerScreen>
       final post = widget.posts[i];
       if (post.isVideo) continue;
       // Use displayUrl preferably (full res), then sample, then thumbnail
-      final url = post.displayUrl ?? post.sampleUrl ?? post.thumbnailUrl;
+      final url = post.previewUrl ?? post.thumbnailUrl ?? post.sampleUrl ?? post.fileUrl;
       if (url == null || url.isEmpty) continue;
       precacheImage(
         CachedNetworkImageProvider(url),
@@ -102,6 +97,24 @@ class _ViewerScreenState extends State<ViewerScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (widget.posts.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF090B16),
+        body: SafeArea(
+          child: Center(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.image_not_supported_outlined,
+                  color: Colors.white54, size: 42),
+              const SizedBox(height: 12),
+              const Text('This post is no longer available',
+                  style: TextStyle(color: Colors.white70)),
+              const SizedBox(height: 12),
+              TextButton(onPressed: () => context.pop(), child: const Text('Go back')),
+            ]),
+          ),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: Colors.black,
       extendBodyBehindAppBar: true,
@@ -114,7 +127,6 @@ class _ViewerScreenState extends State<ViewerScreen>
             child: _MediaGallery(
               posts: widget.posts,
               pageController: _pageController,
-              initialIndex: _currentIndex,
               onPageChanged: (index) {
                 setState(() {
                   _currentIndex = index;
@@ -126,9 +138,13 @@ class _ViewerScreenState extends State<ViewerScreen>
           ),
 
           // ─── Top Bar ──────────────────────────────────────────────────────
-          FadeTransition(
-            opacity: _uiAnim,
-            child: _TopBar(
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: FadeTransition(
+              opacity: _uiAnim,
+              child: _TopBar(
               post: _currentPost,
               currentIndex: _currentIndex,
               total: widget.posts.length,
@@ -137,16 +153,17 @@ class _ViewerScreenState extends State<ViewerScreen>
                 context.pop();
               },
               onInfo: () => setState(() => _showDetails = !_showDetails),
+              ),
             ),
           ),
 
           // ─── Bottom Actions ───────────────────────────────────────────────
-          FadeTransition(
-            opacity: _uiAnim,
-            child: Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: FadeTransition(
+              opacity: _uiAnim,
               child: _BottomActions(
                 post: _currentPost,
                 onDetailsToggle: () =>
@@ -175,105 +192,108 @@ class _ViewerScreenState extends State<ViewerScreen>
 class _MediaGallery extends StatelessWidget {
   final List<Post> posts;
   final PageController pageController;
-  final int initialIndex;
   final ValueChanged<int> onPageChanged;
 
   const _MediaGallery({
     required this.posts,
     required this.pageController,
-    required this.initialIndex,
     required this.onPageChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return PhotoViewGallery.builder(
-      pageController: pageController,
+    return PageView.builder(
+      controller: pageController,
       itemCount: posts.length,
       onPageChanged: onPageChanged,
-      scrollPhysics: const BouncingScrollPhysics(),
-      backgroundDecoration: const BoxDecoration(color: Colors.black),
-      // FIX: Do NOT use loadingBuilder as a shared widget — it causes the
-      // gallery to show a single loading indicator for the entire viewport
-      // which appears as a grey/black screen while images load. Each page
-      // option's own builder handles its loading state individually below.
-      builder: (context, index) {
+      physics: const BouncingScrollPhysics(),
+      itemBuilder: (context, index) {
         final post = posts[index];
-
-        if (post.isVideo) {
-          return PhotoViewGalleryPageOptions.customChild(
-            child: _VideoPlayerWidget(post: post),
-            minScale: PhotoViewComputedScale.contained,
-            maxScale: PhotoViewComputedScale.covered * 2.5,
-            heroAttributes: PhotoViewHeroAttributes(tag: post.uniqueId),
-          );
-        }
-
-        // FIX: Use the best available URL; fall back down the chain
-        // instead of using null which causes the grey screen.
-        final url = _bestUrl(post);
-
-        if (url == null || url.isEmpty) {
-          return PhotoViewGalleryPageOptions.customChild(
-            child: const Center(
-              child: Icon(
-                Icons.broken_image_outlined,
-                size: 64,
-                color: Colors.white30,
-              ),
-            ),
-            minScale: PhotoViewComputedScale.contained,
-            maxScale: PhotoViewComputedScale.contained,
-          );
-        }
-
-        return PhotoViewGalleryPageOptions(
-          imageProvider: CachedNetworkImageProvider(url),
-          minScale: PhotoViewComputedScale.contained * 0.8,
-          maxScale: PhotoViewComputedScale.covered * 3.0,
-          heroAttributes: PhotoViewHeroAttributes(tag: post.uniqueId),
-          filterQuality: FilterQuality.high,
-          // FIX: inline error builder per-page so errors show in-place
-          // instead of as a shared grey screen
-          errorBuilder: (context, error, stackTrace) => const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.broken_image_outlined,
-                    size: 52, color: Colors.white30),
-                SizedBox(height: 12),
-                Text(
-                  'Failed to load image',
-                  style: TextStyle(color: Colors.white38, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-        );
+        return post.isVideo
+            ? _VideoPlayerWidget(key: ValueKey(post.uniqueId), post: post)
+            : _ViewerImagePage(key: ValueKey(post.uniqueId), post: post);
       },
-      // FIX: Use per-page loading indicator via customChild pattern above;
-      // removing the shared loadingBuilder prevents the "entire gallery
-      // shows grey while one page loads" bug.
     );
   }
+}
 
-  // Selects the best available image URL for a post, working down from
-  // full-size to sample to preview to thumbnail. Returning null is valid —
-  // the caller renders a placeholder instead of a blank screen.
-  String? _bestUrl(Post post) {
-    if (post.fileUrl?.isNotEmpty == true) return post.fileUrl;
-    if (post.sampleUrl?.isNotEmpty == true) return post.sampleUrl;
-    if (post.previewUrl?.isNotEmpty == true) return post.previewUrl;
-    if (post.thumbnailUrl?.isNotEmpty == true) return post.thumbnailUrl;
-    return null;
+class _ViewerImagePage extends StatefulWidget {
+  final Post post;
+  const _ViewerImagePage({super.key, required this.post});
+
+  @override
+  State<_ViewerImagePage> createState() => _ViewerImagePageState();
+}
+
+class _ViewerImagePageState extends State<_ViewerImagePage> {
+  int _urlIndex = 0;
+
+  List<String> get _urls => [
+        widget.post.previewUrl,
+        widget.post.thumbnailUrl,
+        widget.post.sampleUrl,
+        widget.post.fileUrl,
+      ].whereType<String>().where((url) => url.isNotEmpty).toSet().toList();
+
+  void _tryNextUrl() {
+    if (mounted && _urlIndex < _urls.length - 1) {
+      setState(() => _urlIndex++);
+    }
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final urls = _urls;
+    if (urls.isEmpty || _urlIndex >= urls.length) {
+      return const _ViewerImageError();
+    }
+    final size = MediaQuery.sizeOf(context);
+    return InteractiveViewer(
+      minScale: 1,
+      maxScale: 4,
+      child: CachedNetworkImage(
+        imageUrl: urls[_urlIndex],
+        width: size.width,
+        height: size.height,
+        fit: BoxFit.contain,
+        fadeInDuration: const Duration(milliseconds: 140),
+        placeholder: (context, _) => const Center(
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Color(0xFF9D8BFF),
+            ),
+          ),
+        ),
+        errorWidget: (context, _, __) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _tryNextUrl());
+          return const _ViewerImageError();
+        },
+      ),
+    );
+  }
+}
+
+class _ViewerImageError extends StatelessWidget {
+  const _ViewerImageError();
+
+  @override
+  Widget build(BuildContext context) => const Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.broken_image_outlined, size: 52, color: Colors.white38),
+          SizedBox(height: 12),
+          Text('Image unavailable', style: TextStyle(color: Colors.white60)),
+        ]),
+      );
 }
 
 // ─── Video Player ─────────────────────────────────────────────────────────
 
 class _VideoPlayerWidget extends StatefulWidget {
   final Post post;
-  const _VideoPlayerWidget({required this.post});
+  const _VideoPlayerWidget({super.key, required this.post});
 
   @override
   State<_VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
@@ -378,11 +398,7 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
+    return Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -439,7 +455,6 @@ class _TopBar extends StatelessWidget {
             _ViewerButton(icon: Icons.info_outline_rounded, onTap: onInfo),
           ],
         ),
-      ),
     );
   }
 }
@@ -477,6 +492,98 @@ class _BottomActions extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Container(
+            margin: const EdgeInsets.only(bottom: 13),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xD91A1D2D),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withOpacity(0.14)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF8A73FF), Color(0xFF4D8FFF)],
+                      ),
+                    ),
+                    child: const Icon(Icons.person_rounded,
+                        color: Colors.white, size: 21),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          post.uploaderName ?? post.source.domain,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${post.source.shortName}  ·  Post #${post.id}',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (post.score != 0)
+                    Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.arrow_upward_rounded,
+                          color: Color(0xFF87D7BA), size: 15),
+                      const SizedBox(width: 3),
+                      Text('${post.score}',
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.w700)),
+                    ]),
+                ]),
+                if (post.description?.isNotEmpty ?? false) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    post.description!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+                if (post.tags.isNotEmpty) ...[
+                  const SizedBox(height: 9),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 5,
+                    children: post.tags.take(4).map((tag) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF8E7BFF).withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Text('#${tag.displayName}',
+                          style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                    )).toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
           // Score chip
           if (post.score != 0)
             Align(
