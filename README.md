@@ -4,13 +4,20 @@ This is a source overlay for the existing Flutter app. Copy the `lib` folder and
 
 ## Changes in v14
 
-- Reworked Search into a more substantial floating glass dock: separate search and filter controls, a roomy inset query field, horizontally scrolling tag chips, and rounded suggestions.
+- Reworked Search into a more substantial floating glass dock: separate search and filter controls, a plain inline query field, horizontally scrolling tag chips, and rounded suggestions.
 - Increased tab dock contrast and label legibility so the icons and names stay clear against changing content behind the glass.
 - Added Posts and Favorite Tags sections to Favorites. Tap a post tag to search it; press and hold briefly to save or remove it from Favorite Tags.
 - Added a persistent 2 / 3 / 4 column control to Feed, sharing the saved Grid Columns preference with Settings and Favorites. The default remains the existing two-column feed.
 - Added a single-post feed mode that loads the original image URL and fits the complete image inside the media area. Double-tap to favorite and press and hold to export an image or video to Photos.
 - Reused the Photos export helper in both the single-post feed and full-screen viewer, including the existing WebM-to-MP4 conversion path.
 - Fixed the missing closing parenthesis in the search input reported by the iOS release build.
+
+## Finishing fixes
+
+- Removed the extra inset search-field box so tags and query text sit in the main glass search dock. Tapping a suggestion adds it to the query and keeps Search open; search submission now happens on the keyboard's Search/Enter action.
+- Made favorite-tag gestures work both in the post tag panel and on the visible tag chips. Tap to search; press and hold to save or remove the tag, with an immediate confirmation and saved-state indicator.
+- Increased the glass dock's edge contrast and inset spacing around the tab highlight so the tab bar border stays visible.
+- Tied video playback to the active viewer page and single-post feed visibility. Swiping pauses and mutes the old video; the feed resumes it only if that same post remains in view.
 
 ## Changes in v13
 

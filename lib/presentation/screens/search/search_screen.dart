@@ -95,13 +95,14 @@ class _SearchScreenState extends State<SearchScreen>
       _showSuggestions = false;
     });
     context.read<SearchBloc>().add(SearchQueryChanged(''));
-    // Auto-search when a tag is confirmed
-    _submitSearch();
+    // Selecting a suggestion only edits the query. Keep the keyboard ready so
+    // the user can add more tags; the search runs when they press Enter.
+    _inputFocus.requestFocus();
   }
 
   void _removeTag(String tag) {
     setState(() => _tagChips.remove(tag));
-    _submitSearch();
+    _inputFocus.requestFocus();
   }
 
   void _submitSearch() {
@@ -424,20 +425,10 @@ class _TagChipInput extends StatelessWidget {
     final theme = Theme.of(context);
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => inputFocus.requestFocus(),
-      child: Container(
+      child: SizedBox(
         height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface.withOpacity(
-            theme.brightness == Brightness.dark ? 0.84 : 0.9,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: theme.colorScheme.primary.withOpacity(0.26),
-            width: 0.8,
-          ),
-        ),
         child: Row(
           children: [
             if (tagChips.isNotEmpty) ...[
@@ -471,7 +462,7 @@ class _TagChipInput extends StatelessWidget {
                 ),
                 decoration: InputDecoration(
                   isDense: true,
-                  hintText: tagChips.isEmpty ? 'Search tags...' : 'Add tag...',
+                  hintText: 'Search tags…',
                   hintStyle: theme.textTheme.bodyLarge?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
                     fontSize: 16,
@@ -480,13 +471,7 @@ class _TagChipInput extends StatelessWidget {
                   contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
                 textInputAction: TextInputAction.search,
-                onSubmitted: (v) {
-                  if (v.trim().isNotEmpty) {
-                    onTagAdded(v.trim());
-                  } else {
-                    onSubmitted(v);
-                  }
-                },
+                onSubmitted: onSubmitted,
                 // Space bar also adds tag
                 onChanged: (v) {
                   if (v.endsWith(' ') && v.trim().isNotEmpty) {

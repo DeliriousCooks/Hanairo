@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -62,12 +63,14 @@ class PostGridSliver extends StatelessWidget {
 /// contained in the media window so the post is visible without cropping.
 class SinglePostFeedSliver extends StatelessWidget {
   final List<Post> posts;
+  final ScrollController scrollController;
   final ValueChanged<Post> onFavoriteTapped;
   final void Function(Post post, int index) onPostTapped;
 
   const SinglePostFeedSliver({
     super.key,
     required this.posts,
+    required this.scrollController,
     required this.onFavoriteTapped,
     required this.onPostTapped,
   });
@@ -78,6 +81,7 @@ class SinglePostFeedSliver extends StatelessWidget {
           (context, index) => _SinglePostFeedCard(
             key: ValueKey('single_${posts[index].uniqueId}'),
             post: posts[index],
+            scrollController: scrollController,
             onFavorite: () => onFavoriteTapped(posts[index]),
             onTap: () => onPostTapped(posts[index], index),
           ),
@@ -88,12 +92,14 @@ class SinglePostFeedSliver extends StatelessWidget {
 
 class _SinglePostFeedCard extends StatefulWidget {
   final Post post;
+  final ScrollController scrollController;
   final VoidCallback onFavorite;
   final VoidCallback onTap;
 
   const _SinglePostFeedCard({
     super.key,
     required this.post,
+    required this.scrollController,
     required this.onFavorite,
     required this.onTap,
   });
@@ -240,7 +246,10 @@ class _SinglePostFeedCardState extends State<_SinglePostFeedCard> {
                       color: theme.brightness == Brightness.dark
                           ? const Color(0xFF08080A)
                           : theme.colorScheme.surfaceContainerHighest,
-                      child: _SingleFeedMedia(post: widget.post),
+                      child: _SingleFeedMedia(
+                        post: widget.post,
+                        scrollController: widget.scrollController,
+                      ),
                     ),
                     if (_saving)
                       const Positioned(
@@ -370,7 +379,11 @@ class _FeedHintPill extends StatelessWidget {
 
 class _SingleFeedMedia extends StatefulWidget {
   final Post post;
-  const _SingleFeedMedia({required this.post});
+  final ScrollController scrollController;
+  const _SingleFeedMedia({
+    required this.post,
+    required this.scrollController,
+  });
 
   @override
   State<_SingleFeedMedia> createState() => _SingleFeedMediaState();
@@ -379,8 +392,13 @@ class _SingleFeedMedia extends StatefulWidget {
 class _SingleFeedMediaState extends State<_SingleFeedMedia> {
   int _urlIndex = 0;
   VideoPlayerController? _video;
+  ScrollPosition? _observedPosition;
+  Future<void> _playerQueue = Future<void>.value();
   String? _videoError;
   bool _muted = true;
+  bool _playRequested = false;
+  bool _pauseQueued = false;
+  bool _playQueued = false;
 
   List<String> get _urls => [
         widget.post.fileUrl,
@@ -392,7 +410,129 @@ class _SingleFeedMediaState extends State<_SingleFeedMedia> {
   @override
   void initState() {
     super.initState();
-    if (widget.post.isVideo) _initializeVideo();
+    widget.scrollController.addListener(_syncPlaybackWithScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _attachScrollPosition());
+    if (widget.post.isVideo) unawaited(_initializeVideo());
+  }
+
+  @override
+  void didUpdateWidget(covariant _SingleFeedMedia oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.scrollController == widget.scrollController) return;
+    oldWidget.scrollController.removeListener(_syncPlaybackWithScroll);
+    _observedPosition?.isScrollingNotifier.removeListener(_syncPlaybackWithScroll);
+    _observedPosition = null;
+    widget.scrollController.addListener(_syncPlaybackWithScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _attachScrollPosition());
+  }
+
+  void _attachScrollPosition() {
+    if (!mounted || !widget.scrollController.hasClients) return;
+    final position = widget.scrollController.position;
+    if (!identical(position, _observedPosition)) {
+      _observedPosition?.isScrollingNotifier.removeListener(_syncPlaybackWithScroll);
+      _observedPosition = position;
+      position.isScrollingNotifier.addListener(_syncPlaybackWithScroll);
+    }
+    _syncPlaybackWithScroll();
+  }
+
+  bool _isMediaVisible() {
+    final mediaObject = context.findRenderObject();
+    if (mediaObject is! RenderBox || !mediaObject.attached) return false;
+
+    final viewportObject = RenderAbstractViewport.of(mediaObject);
+    if (viewportObject is! RenderBox || !viewportObject.attached) return false;
+
+    final mediaRect = mediaObject.localToGlobal(Offset.zero) & mediaObject.size;
+    final viewportRect =
+        viewportObject.localToGlobal(Offset.zero) & viewportObject.size;
+    // The floating bottom tabs sit over the scroll view; don't count the
+    // covered portion as visible when deciding whether this video may play.
+    final coveredBottom = MediaQuery.paddingOf(context).bottom + 100;
+    final visibleBottom = (viewportRect.bottom - coveredBottom)
+        .clamp(viewportRect.top, viewportRect.bottom)
+        .toDouble();
+    final unobscuredViewport = Rect.fromLTRB(
+      viewportRect.left,
+      viewportRect.top,
+      viewportRect.right,
+      visibleBottom,
+    );
+    final visible = mediaRect.intersect(unobscuredViewport);
+    return !visible.isEmpty && visible.height / mediaObject.size.height >= 0.55;
+  }
+
+  void _syncPlaybackWithScroll() {
+    final video = _video;
+    final position = _observedPosition;
+    if (!mounted || video == null || !video.value.isInitialized || position == null) {
+      return;
+    }
+
+    if (position.isScrollingNotifier.value) {
+      if (video.value.isPlaying) _playRequested = true;
+      if (video.value.isPlaying || video.value.volume > 0) {
+        unawaited(_pauseAndMute());
+      }
+      return;
+    }
+
+    if (_playRequested && _isMediaVisible()) {
+      unawaited(_playVideo());
+    } else if (!_isMediaVisible() &&
+        (video.value.isPlaying || video.value.volume > 0)) {
+      unawaited(_pauseAndMute());
+    }
+  }
+
+  Future<void> _enqueuePlayerOperation(Future<void> Function() operation) {
+    final next = _playerQueue.then<void>(
+      (_) => operation(),
+      onError: (Object _) => operation(),
+    );
+    _playerQueue = next;
+    return next;
+  }
+
+  Future<void> _playVideo() async {
+    final video = _video;
+    if (!mounted || video == null || !video.value.isInitialized || _playQueued) return;
+    _playQueued = true;
+    await _enqueuePlayerOperation(() async {
+      try {
+        if (!mounted || !identical(_video, video) || !_playRequested) return;
+        await video.setVolume(_muted ? 0 : 1);
+        if (!mounted || !identical(_video, video) || !_playRequested) return;
+        final scrolling = _observedPosition?.isScrollingNotifier.value ?? false;
+        if (scrolling || !_isMediaVisible()) {
+          await video.pause();
+          await video.setVolume(0);
+          return;
+        }
+        await video.play();
+      } catch (_) {
+        // The page can leave the viewport while the platform player is updating.
+      } finally {
+        _playQueued = false;
+      }
+    });
+  }
+
+  Future<void> _pauseAndMute() async {
+    final video = _video;
+    if (video == null || !video.value.isInitialized || _pauseQueued) return;
+    _pauseQueued = true;
+    await _enqueuePlayerOperation(() async {
+      try {
+        await video.pause();
+        await video.setVolume(0);
+      } catch (_) {
+        // The video may be initializing or already disposed.
+      } finally {
+        _pauseQueued = false;
+      }
+    });
   }
 
   Future<void> _initializeVideo() async {
@@ -407,7 +547,10 @@ class _SingleFeedMediaState extends State<_SingleFeedMedia> {
       await controller.initialize();
       await controller.setLooping(true);
       await controller.setVolume(0);
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+        _syncPlaybackWithScroll();
+      }
     } catch (_) {
       if (mounted) setState(() => _videoError = 'Could not load video');
     }
@@ -415,6 +558,8 @@ class _SingleFeedMediaState extends State<_SingleFeedMedia> {
 
   @override
   void dispose() {
+    widget.scrollController.removeListener(_syncPlaybackWithScroll);
+    _observedPosition?.isScrollingNotifier.removeListener(_syncPlaybackWithScroll);
     _video?.dispose();
     super.dispose();
   }
@@ -482,8 +627,9 @@ class _SingleFeedMediaState extends State<_SingleFeedMedia> {
             icon: _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
             onPressed: () async {
               final next = !_muted;
+              setState(() => _muted = next);
               await controller.setVolume(next ? 0 : 1);
-              if (mounted) setState(() => _muted = next);
+              _syncPlaybackWithScroll();
             },
           ),
         ),
@@ -495,7 +641,15 @@ class _SingleFeedMediaState extends State<_SingleFeedMedia> {
               icon: value.isPlaying
                   ? Icons.pause_rounded
                   : Icons.play_arrow_rounded,
-              onPressed: () => value.isPlaying ? controller.pause() : controller.play(),
+              onPressed: () {
+                if (value.isPlaying) {
+                  _playRequested = false;
+                  unawaited(_pauseAndMute());
+                } else {
+                  _playRequested = true;
+                  unawaited(_playVideo());
+                }
+              },
               large: true,
             ),
           ),

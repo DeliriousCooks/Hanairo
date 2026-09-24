@@ -31,11 +31,11 @@ class LiquidGlassSurface extends StatelessWidget {
         ? (isOled ? const Color(0xFF08080A) : const Color(0xFF17151E))
         : const Color(0xFFFDFBFF);
     final fillOpacity = highContrast
-        ? (isDark ? (isOled ? 0.96 : 0.90) : 0.9)
+        ? (isDark ? (isOled ? 0.985 : 0.96) : 0.94)
         : (isDark ? (isOled ? 0.82 : 0.60) : 0.62);
     final edge = isDark
-        ? Colors.white.withOpacity(isOled ? 0.20 : 0.24)
-        : Colors.white.withOpacity(0.78);
+        ? Colors.white.withOpacity(highContrast ? 0.40 : (isOled ? 0.20 : 0.24))
+        : Colors.white.withOpacity(highContrast ? 0.92 : 0.78);
     final safeSigma = sigma.clamp(10.0, 24.0).toDouble();
 
     return DecoratedBox(
@@ -70,7 +70,7 @@ class LiquidGlassSurface extends StatelessWidget {
                         Colors.white.withOpacity(highContrast ? 0.08 : 0.22),
                       ],
               ),
-              border: Border.all(color: edge, width: 0.8),
+              border: Border.all(color: edge, width: highContrast ? 1.1 : 0.8),
             ),
             child: child,
           ),

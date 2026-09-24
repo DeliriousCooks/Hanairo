@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -155,6 +156,7 @@ class _ViewerScreenState extends State<ViewerScreen>
                       child: _MediaGallery(
                         posts: widget.posts,
                         pageController: _pageController,
+                        activeIndex: _currentIndex,
                         onPageChanged: (index) {
                           setState(() {
                             _currentIndex = index;
@@ -199,11 +201,13 @@ class _ViewerScreenState extends State<ViewerScreen>
 class _MediaGallery extends StatelessWidget {
   final List<Post> posts;
   final PageController pageController;
+  final int activeIndex;
   final ValueChanged<int> onPageChanged;
 
   const _MediaGallery({
     required this.posts,
     required this.pageController,
+    required this.activeIndex,
     required this.onPageChanged,
   });
 
@@ -219,7 +223,11 @@ class _MediaGallery extends StatelessWidget {
       itemBuilder: (context, index) {
         final post = posts[index];
         return post.isVideo
-            ? _VideoPlayerWidget(key: ValueKey(post.uniqueId), post: post)
+            ? _VideoPlayerWidget(
+                key: ValueKey(post.uniqueId),
+                post: post,
+                isActive: index == activeIndex,
+              )
             : _ViewerImagePage(key: ValueKey(post.uniqueId), post: post);
       },
     );
@@ -302,7 +310,12 @@ class _ViewerImageError extends StatelessWidget {
 
 class _VideoPlayerWidget extends StatefulWidget {
   final Post post;
-  const _VideoPlayerWidget({super.key, required this.post});
+  final bool isActive;
+  const _VideoPlayerWidget({
+    super.key,
+    required this.post,
+    required this.isActive,
+  });
 
   @override
   State<_VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
@@ -317,7 +330,20 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
   @override
   void initState() {
     super.initState();
-    _initPlayer();
+    unawaited(_initPlayer());
+  }
+
+  @override
+  void didUpdateWidget(covariant _VideoPlayerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive == widget.isActive) return;
+    if (widget.isActive) {
+      unawaited(_startPlayback());
+    } else {
+      // Pause as soon as this page stops being the selected post. Also mute
+      // immediately so audio cannot leak while a retained page is settling.
+      unawaited(_stopPlayback());
+    }
   }
 
   Future<void> _initPlayer() async {
@@ -328,15 +354,53 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
     }
 
     try {
-      _vpController = VideoPlayerController.networkUrl(Uri.parse(url));
-      await _vpController!.initialize();
-      await _vpController!.setLooping(true);
-      await _vpController!.setVolume(0);
-      await _vpController!.play();
-
-      if (mounted) setState(() => _initialized = true);
+      final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+      _vpController = controller;
+      await controller.initialize();
+      await controller.setLooping(true);
+      if (!mounted || !identical(_vpController, controller)) return;
+      setState(() => _initialized = true);
+      if (widget.isActive) {
+        await _startPlayback();
+      } else {
+        await _stopPlayback();
+      }
     } catch (e) {
       if (mounted) setState(() => _error = 'Failed to load video');
+    }
+  }
+
+  Future<void> _startPlayback() async {
+    final controller = _vpController;
+    if (!mounted || !widget.isActive || controller == null ||
+        !controller.value.isInitialized) {
+      return;
+    }
+    try {
+      await controller.setVolume(_muted ? 0 : 1);
+      if (!mounted || !widget.isActive ||
+          !identical(_vpController, controller)) {
+        await _stopPlayback();
+        return;
+      }
+      await controller.play();
+      if (!mounted || !widget.isActive ||
+          !identical(_vpController, controller)) {
+        await _stopPlayback();
+      }
+    } catch (_) {
+      // A page can be disposed while the platform player is changing state.
+    }
+  }
+
+  Future<void> _stopPlayback() async {
+    final controller = _vpController;
+    if (controller == null || !controller.value.isInitialized) return;
+    try {
+      await controller.pause();
+      await controller.setVolume(0);
+    } catch (_) {
+      // The player may still be initializing or already disposed.
     }
   }
 
@@ -715,14 +779,17 @@ class _BottomActions extends StatelessWidget {
                   Wrap(
                     spacing: 6,
                     runSpacing: 5,
-                    children: post.tags.take(4).map((tag) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF8E7BFF).withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(9),
+                    children: post.tags.take(4).map((tag) => _FavoriteTagGesture(
+                      tag: tag,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF8E7BFF).withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Text('#${tag.displayName}',
+                            style: const TextStyle(color: Colors.white70, fontSize: 10)),
                       ),
-                      child: Text('#${tag.displayName}',
-                          style: const TextStyle(color: Colors.white70, fontSize: 10)),
                     )).toList(),
                   ),
                 ],
@@ -1112,6 +1179,40 @@ class _RatingBadge extends StatelessWidget {
   }
 }
 
+class _FavoriteTagGesture extends StatelessWidget {
+  final PostTag tag;
+  final Widget child;
+
+  const _FavoriteTagGesture({required this.tag, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final local = context.read<LocalRepository>();
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        context.go('/search?q=${Uri.encodeQueryComponent(tag.name)}');
+      },
+      onLongPress: () async {
+        HapticFeedback.mediumImpact();
+        final wasSaved = local.isFavoriteTag(tag.name);
+        await local.toggleFavoriteTag(tag.name);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            content: Text(wasSaved
+                ? 'Removed ${tag.displayName} from favorite tags'
+                : 'Saved ${tag.displayName} to favorite tags'),
+            duration: const Duration(seconds: 1),
+          ));
+      },
+      child: child,
+    );
+  }
+}
+
 class _TagsSection extends StatelessWidget {
   final Post post;
   const _TagsSection({required this.post});
@@ -1179,26 +1280,8 @@ class _TagsSection extends StatelessWidget {
                       valueListenable: local.favoriteTagsRevision,
                       builder: (context, _, __) {
                         final isSaved = local.isFavoriteTag(tag.name);
-                        return GestureDetector(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            context.go(
-                              '/search?q=${Uri.encodeQueryComponent(tag.name)}',
-                            );
-                          },
-                          onLongPress: () async {
-                            HapticFeedback.mediumImpact();
-                            await local.toggleFavoriteTag(tag.name);
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context)
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(SnackBar(
-                                content: Text(isSaved
-                                    ? 'Removed ${tag.displayName} from favorite tags'
-                                    : 'Saved ${tag.displayName} to favorite tags'),
-                                duration: const Duration(seconds: 1),
-                              ));
-                          },
+                        return _FavoriteTagGesture(
+                          tag: tag,
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 160),
                             padding: const EdgeInsets.symmetric(

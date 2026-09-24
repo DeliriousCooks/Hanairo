@@ -310,9 +310,9 @@ class _BottomNav extends StatelessWidget {
           highContrast: true,
           borderRadius: BorderRadius.circular(27),
           child: SizedBox(
-            height: 78,
+            height: 84,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
               child: Row(
                 mainAxisSize: MainAxisSize.max,
                 crossAxisAlignment: CrossAxisAlignment.center,

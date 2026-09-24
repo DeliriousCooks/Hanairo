@@ -33,6 +33,7 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
+  final ScrollController _feedScrollController = ScrollController();
   List<Post> _posts = const [];
   List<BooruSource> _sources = const [];
   List<BooruSource> _failedSources = const [];
@@ -65,6 +66,7 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   void dispose() {
     _localRepository.gridColumnsRevision.removeListener(_onGridColumnsChanged);
+    _feedScrollController.dispose();
     super.dispose();
   }
 
@@ -243,6 +245,7 @@ class _FeedScreenState extends State<FeedScreen> {
         onRefresh: _loadFeed,
         color: theme.colorScheme.primary,
         child: CustomScrollView(
+          controller: _feedScrollController,
           physics: visible.isEmpty && !_loading
               ? const ClampingScrollPhysics()
               : const AlwaysScrollableScrollPhysics(
@@ -668,6 +671,7 @@ class _FeedScreenState extends State<FeedScreen> {
                   key: ValueKey(
                       '${_feedMode.name}-${_layout.name}-${_order.name}-${_sourceFilter?.name}'),
                   posts: visible,
+                  scrollController: _feedScrollController,
                   onFavoriteTapped: _toggleFavorite,
                   onPostTapped: _openViewer,
                 ),
