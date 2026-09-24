@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../domain/entities/post.dart';
@@ -15,6 +16,7 @@ class LocalRepository {
   late Box<String> _blacklist;
   late Box<dynamic> _settings;
   final _secureStorage = const FlutterSecureStorage();
+  final ValueNotifier<int> favoritesRevision = ValueNotifier<int>(0);
 
   Future<void> init() async {
     await Hive.initFlutter();
@@ -29,10 +31,12 @@ class LocalRepository {
   Future<void> addFavorite(Post post) async {
     final json = jsonEncode(_postToMap(post));
     await _favorites.put(post.uniqueId, json);
+    favoritesRevision.value++;
   }
 
   Future<void> removeFavorite(String uniqueId) async {
     await _favorites.delete(uniqueId);
+    favoritesRevision.value++;
   }
 
   bool isFavorite(String uniqueId) => _favorites.containsKey(uniqueId);

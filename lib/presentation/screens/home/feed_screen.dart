@@ -150,51 +150,139 @@ class _FeedScreenState extends State<FeedScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(20, top + 16, 20, 20),
-                child: Row(children: [
-                  Container(
-                    width: 42,
-                    height: 42,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(25),
+                  child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
                       gradient: LinearGradient(
-                        colors: [theme.colorScheme.primary, const Color(0xFF528BEE)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
+                        colors: [
+                          theme.colorScheme.primary.withOpacity(0.24),
+                          const Color(0xFF365FD2).withOpacity(0.16),
+                          const Color(0xFFCC67E7).withOpacity(0.12),
+                        ],
                       ),
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(color: Colors.white.withOpacity(0.12)),
                       boxShadow: [
                         BoxShadow(
-                          color: theme.colorScheme.primary.withOpacity(0.24),
-                          blurRadius: 17,
+                          color: theme.colorScheme.primary.withOpacity(0.13),
+                          blurRadius: 28,
+                          spreadRadius: -10,
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.all(5),
-                    child: SvgPicture.asset('assets/images/booruwave_mark.svg'),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Stack(
+                      clipBehavior: Clip.hardEdge,
                       children: [
-                        Text('BooruWave', style: theme.textTheme.titleLarge),
-                        Text('Your daily wave of art',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            )),
+                        Positioned(
+                          right: -26,
+                          top: -58,
+                          child: Container(
+                            width: 150,
+                            height: 150,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(colors: [
+                                const Color(0xFF8C70FF).withOpacity(0.34),
+                                const Color(0xFF8C70FF).withOpacity(0.01),
+                              ]),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          right: 46,
+                          bottom: -76,
+                          child: Container(
+                            width: 142,
+                            height: 142,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(colors: [
+                                const Color(0xFF46D7E8).withOpacity(0.22),
+                                const Color(0xFF46D7E8).withOpacity(0.01),
+                              ]),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
+                          child: Row(children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF9D7BFF), Color(0xFF367FEF)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: theme.colorScheme.primary.withOpacity(0.34),
+                                    blurRadius: 20,
+                                  ),
+                                ],
+                              ),
+                              padding: const EdgeInsets.all(5),
+                              child: SvgPicture.asset('assets/images/booruwave_mark.svg'),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('BooruWave', style: theme.textTheme.titleLarge),
+                                  const SizedBox(height: 2),
+                                  Text('Your daily wave of art',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.onSurfaceVariant,
+                                      )),
+                                  const SizedBox(height: 7),
+                                  Row(children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF6DE5CA),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _sources.isEmpty
+                                          ? 'READY TO DISCOVER'
+                                          : 'LIVE FROM ${_sources.length} BOORU SITES',
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        color: theme.colorScheme.onSurface.withOpacity(0.74),
+                                        letterSpacing: 0.75,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ]),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Account',
+                              onPressed: () => context.go('/account'),
+                              icon: Icon(Icons.person_outline_rounded,
+                                  color: theme.colorScheme.onSurfaceVariant),
+                              style: IconButton.styleFrom(
+                                backgroundColor: theme.colorScheme.surfaceContainerHighest
+                                    .withOpacity(0.65),
+                              ),
+                            ),
+                          ]),
+                        ),
                       ],
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Account',
-                    onPressed: () => context.go('/account'),
-                    icon: Icon(Icons.person_outline_rounded,
-                        color: theme.colorScheme.onSurfaceVariant),
-                    style: IconButton.styleFrom(
-                      backgroundColor:
-                          theme.colorScheme.surfaceContainerHighest.withOpacity(0.65),
-                    ),
-                  ),
-                ]),
+                ),
               ),
             ),
             SliverToBoxAdapter(

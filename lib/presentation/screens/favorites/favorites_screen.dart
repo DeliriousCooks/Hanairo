@@ -18,6 +18,7 @@ class FavoritesScreen extends StatefulWidget {
 class _FavoritesScreenState extends State<FavoritesScreen>
     with AutomaticKeepAliveClientMixin {
   List<Post> _favorites = [];
+  late LocalRepository _localRepository;
 
   @override
   bool get wantKeepAlive => true;
@@ -25,8 +26,18 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   @override
   void initState() {
     super.initState();
+    _localRepository = context.read<LocalRepository>();
+    _localRepository.favoritesRevision.addListener(_onFavoritesChanged);
     _load();
   }
+
+  @override
+  void dispose() {
+    _localRepository.favoritesRevision.removeListener(_onFavoritesChanged);
+    super.dispose();
+  }
+
+  void _onFavoritesChanged() => _load();
 
   @override
   void didChangeDependencies() {
@@ -35,9 +46,10 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   }
 
   void _load() {
-    final repo = context.read<LocalRepository>();
-    final favs = repo.getFavorites();
-    if (favs.length != _favorites.length) {
+    final favs = _localRepository.getFavorites();
+    final oldIds = _favorites.map((post) => post.uniqueId).join('|');
+    final newIds = favs.map((post) => post.uniqueId).join('|');
+    if (newIds != oldIds) {
       setState(() => _favorites = favs);
     }
   }

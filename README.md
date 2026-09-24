@@ -1,21 +1,20 @@
-# BooruWave UI and behavior update
+# BooruWave UI update v5
 
-This source overlay contains the updated Flutter `lib/` folder, BooruWave SVG mark, and `pubspec.yaml` asset registration.
+This is a source overlay for the Flutter app you provided. It contains the updated `lib/` folder, BooruWave SVG asset, and `pubspec.yaml` registration.
 
 ## Apply it
 
 1. Back up the current app folder.
-2. Copy this `lib/` folder over the app's `lib/` folder.
+2. Copy this `lib/` folder over your app's `lib/` folder.
 3. Copy this `assets/` folder into the app folder.
-4. Merge the asset entry from `pubspec.yaml` into your app's `pubspec.yaml`, keeping its current dependencies.
-5. Run `flutter pub get`, then rebuild the iOS app.
+4. Merge the asset entry from `pubspec.yaml` into your existing `pubspec.yaml`; keep your current dependencies.
+5. Run `flutter pub get`, then rebuild your iOS app.
 
-## Changes in this update
+## Included changes
 
-- Fixed the nested keyboard resize and hide the bottom tab bar while the keyboard is open.
-- Rebuilt post viewing around a swipeable, zoomable image viewer with per-image loading, fallback URLs, and clear unavailable-image states. Fixed overlay positioning that could trigger a blank/grey viewer.
-- Restyled the viewer with an uploader/source header, post details, tags, and social-style save/share actions.
-- Show loaded search result counts plus exact per-site counts for a single tag when the booru provides them.
-- Show each selected site's translated search query. Added the `huge_penis` to `big_penis` e621 mapping alongside the existing aliases.
+- Favorite saves update immediately in the viewer, search/feed cards, and Favorites tab.
+- Video posts retain the app's post controls. Play/pause and scrubbing are compact controls within the video area.
+- The viewer gives media its own space between the top bar and the action card, so the post no longer sits under the app controls.
+- Added brighter violet/blue/cyan gradients, animated favorite feedback, and a more colorful Feed header.
 
-Tag aliases are maintained in `lib/core/tags/tag_translator.dart`; site vocabularies differ and the mapping table can be extended over time. The supplied archive lacked complete native build scaffolding, so keep the Android/iOS project files from your original app. This overlay contains no signing credentials or signing workflow files.
+The supplied archive did not include complete native build scaffolding. Keep the Android/iOS project files from your original app. No signing credentials or signing workflow files are included.

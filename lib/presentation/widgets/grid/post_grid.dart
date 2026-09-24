@@ -98,7 +98,7 @@ class _PostTileState extends State<PostTile>
     final theme = Theme.of(context);
     final ext = theme.extension<AppThemeExtension>();
     final post = widget.post;
-    final isFavorite = context.read<LocalRepository>().isFavorite(post.uniqueId);
+    final localRepository = context.read<LocalRepository>();
 
     return GestureDetector(
       onTapDown: (_) {
@@ -147,23 +147,38 @@ class _PostTileState extends State<PostTile>
                 Positioned(
                   top: 6,
                   right: 6,
-                  child: Material(
-                    color: Colors.black.withOpacity(0.42),
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: widget.onFavoriteTapped,
-                      child: Padding(
-                        padding: const EdgeInsets.all(7),
-                        child: Icon(
-                          isFavorite
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          size: 17,
-                          color: isFavorite ? const Color(0xFFFF82B2) : Colors.white,
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: localRepository.favoritesRevision,
+                    builder: (context, _, __) {
+                      final isFavorite =
+                          localRepository.isFavorite(post.uniqueId);
+                      return Material(
+                        color: Colors.black.withOpacity(0.48),
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: widget.onFavoriteTapped,
+                          child: Padding(
+                            padding: const EdgeInsets.all(7),
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 220),
+                              transitionBuilder: (child, animation) =>
+                                  ScaleTransition(scale: animation, child: child),
+                              child: Icon(
+                                isFavorite
+                                    ? Icons.favorite_rounded
+                                    : Icons.favorite_border_rounded,
+                                key: ValueKey(isFavorite),
+                                size: 17,
+                                color: isFavorite
+                                    ? const Color(0xFFFF82B2)
+                                    : Colors.white,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
 

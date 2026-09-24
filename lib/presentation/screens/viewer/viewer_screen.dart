@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
-import 'package:chewie/chewie.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/entities/post.dart';
 import '../../../data/repositories/local_repository.dart';
@@ -116,72 +115,66 @@ class _ViewerScreenState extends State<ViewerScreen>
       );
     }
     return Scaffold(
-      backgroundColor: Colors.black,
-      extendBodyBehindAppBar: true,
-      extendBody: true,
-      body: Stack(
-        children: [
-          // ─── Media Gallery ────────────────────────────────────────────────
-          GestureDetector(
-            onTap: _toggleUI,
-            child: _MediaGallery(
-              posts: widget.posts,
-              pageController: _pageController,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentIndex = index;
-                  _showDetails = false;
-                });
-                _precacheAround(index);
-              },
+      backgroundColor: const Color(0xFF090B16),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                FadeTransition(
+                  opacity: _uiAnim,
+                  child: _TopBar(
+                    post: _currentPost,
+                    currentIndex: _currentIndex,
+                    total: widget.posts.length,
+                    onBack: () {
+                      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+                      context.pop();
+                    },
+                    onInfo: () => setState(() => _showDetails = !_showDetails),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _currentPost.isVideo ? null : _toggleUI,
+                    child: ColoredBox(
+                      color: const Color(0xFF090B16),
+                      child: _MediaGallery(
+                        posts: widget.posts,
+                        pageController: _pageController,
+                        onPageChanged: (index) {
+                          setState(() {
+                            _currentIndex = index;
+                            _showDetails = false;
+                          });
+                          _precacheAround(index);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                FadeTransition(
+                  opacity: _uiAnim,
+                  child: _BottomActions(
+                    post: _currentPost,
+                    onDetailsToggle: () =>
+                        setState(() => _showDetails = !_showDetails),
+                  ),
+                ),
+              ],
             ),
-          ),
-
-          // ─── Top Bar ──────────────────────────────────────────────────────
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: FadeTransition(
-              opacity: _uiAnim,
-              child: _TopBar(
-              post: _currentPost,
-              currentIndex: _currentIndex,
-              total: widget.posts.length,
-              onBack: () {
-                SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-                context.pop();
-              },
-              onInfo: () => setState(() => _showDetails = !_showDetails),
-              ),
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutCubic,
+              bottom: _showDetails ? 0 : -700,
+              left: 0,
+              right: 0,
+              child: _DetailsPanel(post: _currentPost),
             ),
-          ),
-
-          // ─── Bottom Actions ───────────────────────────────────────────────
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: FadeTransition(
-              opacity: _uiAnim,
-              child: _BottomActions(
-                post: _currentPost,
-                onDetailsToggle: () =>
-                    setState(() => _showDetails = !_showDetails),
-              ),
-            ),
-          ),
-
-          // ─── Details Panel ────────────────────────────────────────────────
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOutCubic,
-            bottom: _showDetails ? 0 : -600,
-            left: 0,
-            right: 0,
-            child: _DetailsPanel(post: _currentPost),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -301,7 +294,6 @@ class _VideoPlayerWidget extends StatefulWidget {
 
 class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
   VideoPlayerController? _vpController;
-  ChewieController? _chewieController;
   bool _initialized = false;
   String? _error;
 
@@ -321,15 +313,8 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
     try {
       _vpController = VideoPlayerController.networkUrl(Uri.parse(url));
       await _vpController!.initialize();
-
-      _chewieController = ChewieController(
-        videoPlayerController: _vpController!,
-        autoPlay: true,
-        looping: true,
-        aspectRatio: widget.post.aspectRatio,
-        allowFullScreen: false,
-        showControls: true,
-      );
+      await _vpController!.setLooping(true);
+      await _vpController!.play();
 
       if (mounted) setState(() => _initialized = true);
     } catch (e) {
@@ -340,7 +325,6 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
   @override
   void dispose() {
     _vpController?.dispose();
-    _chewieController?.dispose();
     super.dispose();
   }
 
@@ -362,7 +346,7 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
         ),
       );
     }
-    if (!_initialized || _chewieController == null) {
+    if (!_initialized || _vpController == null) {
       return const Center(
         child: CircularProgressIndicator(
           color: AppColors.primary,
@@ -373,7 +357,57 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
     return Center(
       child: AspectRatio(
         aspectRatio: _vpController!.value.aspectRatio,
-        child: Chewie(controller: _chewieController!),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            VideoPlayer(_vpController!),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(14, 28, 14, 10),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [Color(0x99070A15), Colors.transparent],
+                  ),
+                ),
+                child: VideoProgressIndicator(
+                  _vpController!,
+                  allowScrubbing: true,
+                  colors: const VideoProgressColors(
+                    playedColor: Color(0xFF9D83FF),
+                    bufferedColor: Colors.white38,
+                    backgroundColor: Colors.white24,
+                  ),
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.center,
+              child: ValueListenableBuilder<VideoPlayerValue>(
+                valueListenable: _vpController!,
+                builder: (context, value, _) => Material(
+                  color: Colors.black.withOpacity(0.55),
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    tooltip: value.isPlaying ? 'Pause video' : 'Play video',
+                    onPressed: () => value.isPlaying
+                        ? _vpController!.pause()
+                        : _vpController!.play(),
+                    icon: Icon(
+                      value.isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -472,9 +506,6 @@ class _BottomActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final localRepo = context.read<LocalRepository>();
-    final isFav = localRepo.isFavorite(post.uniqueId);
-
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -485,20 +516,27 @@ class _BottomActions extends StatelessWidget {
       ),
       padding: EdgeInsets.fromLTRB(
         20,
-        32,
+        8,
         20,
-        MediaQuery.of(context).padding.bottom + 20,
+        MediaQuery.of(context).padding.bottom + 10,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             margin: const EdgeInsets.only(bottom: 13),
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xD91A1D2D),
+              gradient: const LinearGradient(
+                colors: [Color(0xE51A1D35), Color(0xE5141B2D)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.14)),
+              border: Border.all(color: const Color(0x669C88FF)),
+              boxShadow: const [
+                BoxShadow(color: Color(0x332D55D8), blurRadius: 20, spreadRadius: -8),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -584,54 +622,11 @@ class _BottomActions extends StatelessWidget {
               ],
             ),
           ),
-          // Score chip
-          if (post.score != 0)
-            Align(
-              alignment: Alignment.centerRight,
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.55),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      post.score > 0
-                          ? Icons.arrow_upward_rounded
-                          : Icons.arrow_downward_rounded,
-                      size: 14,
-                      color: post.score > 0 ? AppColors.success : AppColors.error,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      post.score.abs().toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           // Action buttons row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _ActionButton(
-                icon: isFav ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
-                label: isFav ? 'Saved' : 'Save',
-                color: isFav ? AppColors.ratingExplicit : Colors.white,
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  context.read<SearchBloc>().add(PostFavoriteToggled(post));
-                },
-              ),
+              _SaveAction(post: post),
               _ActionButton(
                 icon: Icons.open_in_browser_rounded,
                 label: 'Source',
@@ -655,6 +650,31 @@ class _BottomActions extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SaveAction extends StatelessWidget {
+  final Post post;
+  const _SaveAction({required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    final localRepository = context.read<LocalRepository>();
+    return ValueListenableBuilder<int>(
+      valueListenable: localRepository.favoritesRevision,
+      builder: (context, _, __) {
+        final saved = localRepository.isFavorite(post.uniqueId);
+        return _ActionButton(
+          icon: saved ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
+          label: saved ? 'Saved' : 'Save',
+          color: saved ? const Color(0xFFFF78AD) : Colors.white,
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            context.read<SearchBloc>().add(PostFavoriteToggled(post));
+          },
+        );
+      },
     );
   }
 }
