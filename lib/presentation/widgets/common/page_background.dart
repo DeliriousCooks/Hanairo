@@ -29,8 +29,9 @@ class PageBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: themeController.preset
-                  .gradient(themeController.brightness),
+              colors: themeController.isOled
+                  ? const [Colors.black, Colors.black]
+                  : themeController.preset.gradient(themeController.brightness),
             ),
           ),
           child: child,

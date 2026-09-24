@@ -1,9 +1,13 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
+import 'package:dio/dio.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/entities/post.dart';
 import '../../../data/repositories/local_repository.dart';
@@ -65,7 +69,7 @@ class _ViewerScreenState extends State<ViewerScreen>
       final post = widget.posts[i];
       if (post.isVideo) continue;
       // Use displayUrl preferably (full res), then sample, then thumbnail
-      final url = post.previewUrl ?? post.thumbnailUrl ?? post.sampleUrl ?? post.fileUrl;
+      final url = post.fileUrl ?? post.sampleUrl ?? post.previewUrl ?? post.thumbnailUrl;
       if (url == null || url.isEmpty) continue;
       precacheImage(
         CachedNetworkImageProvider(url),
@@ -139,6 +143,12 @@ class _ViewerScreenState extends State<ViewerScreen>
                 Expanded(
                   child: GestureDetector(
                     onTap: _currentPost.isVideo ? null : _toggleUI,
+                    onVerticalDragEnd: (details) {
+                      if ((details.primaryVelocity ?? 0) > 420) {
+                        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+                        context.pop();
+                      }
+                    },
                     child: ColoredBox(
                       color: const Color(0xFF090B16),
                       child: _MediaGallery(
@@ -171,7 +181,10 @@ class _ViewerScreenState extends State<ViewerScreen>
               bottom: _showDetails ? 0 : -700,
               left: 0,
               right: 0,
-              child: _DetailsPanel(post: _currentPost),
+              child: _DetailsPanel(
+                post: _currentPost,
+                onDismiss: () => setState(() => _showDetails = false),
+              ),
             ),
           ],
         ),
@@ -222,10 +235,10 @@ class _ViewerImagePageState extends State<_ViewerImagePage> {
   int _urlIndex = 0;
 
   List<String> get _urls => [
+        widget.post.fileUrl,
+        widget.post.sampleUrl,
         widget.post.previewUrl,
         widget.post.thumbnailUrl,
-        widget.post.sampleUrl,
-        widget.post.fileUrl,
       ].whereType<String>().where((url) => url.isNotEmpty).toSet().toList();
 
   void _tryNextUrl() {
@@ -495,6 +508,74 @@ class _TopBar extends StatelessWidget {
 
 // ─── Bottom Actions ───────────────────────────────────────────────────────
 
+String _cleanBooruDescription(String value) => value
+    .replaceAll(RegExp(r'\[\s*from\s+source\s*\]', caseSensitive: false), '')
+    .replaceAll(RegExp(r'\[/?(?:i|b|u|s|quote|spoiler)\]', caseSensitive: false), '')
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();
+
+String _sourcePostUrl(Post post) {
+  if (post.sourceUrl?.isNotEmpty ?? false) return post.sourceUrl!;
+  final id = Uri.encodeComponent(post.id);
+  switch (post.source) {
+    case BooruSource.e621:
+      return 'https://e621.net/posts/$id';
+    case BooruSource.rule34xxx:
+      return 'https://rule34.xxx/index.php?page=post&s=view&id=$id';
+    case BooruSource.gelbooru:
+      return 'https://gelbooru.com/index.php?page=post&s=view&id=$id';
+    case BooruSource.paheal:
+      return 'https://rule34.paheal.net/post/view/$id';
+    case BooruSource.danbooru:
+      return 'https://danbooru.donmai.us/posts/$id';
+    case BooruSource.xbooru:
+      return 'https://xbooru.com/index.php?page=post&s=view&id=$id';
+  }
+}
+
+Future<void> _openSource(BuildContext context, Post post) async {
+  final uri = Uri.tryParse(_sourcePostUrl(post));
+  if (uri != null && await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open the source post')),
+    );
+  }
+}
+
+Future<void> _sharePost(BuildContext context, Post post) async {
+  final link = _sourcePostUrl(post);
+  final mediaUrl = post.fileUrl ?? post.sampleUrl ?? post.previewUrl;
+  try {
+    if (mediaUrl == null || post.isVideo) {
+      await Share.share(link, subject: 'BooruWave post');
+      return;
+    }
+    final response = await Dio().get<List<int>>(
+      mediaUrl,
+      options: Options(responseType: ResponseType.bytes),
+    );
+    final bytes = response.data;
+    if (bytes == null || bytes.isEmpty) throw StateError('Empty media response');
+    final lowerUrl = mediaUrl.toLowerCase();
+    final mime = lowerUrl.contains('.png') ? 'image/png'
+        : lowerUrl.contains('.webp') ? 'image/webp'
+        : lowerUrl.contains('.gif') ? 'image/gif' : 'image/jpeg';
+    final file = XFile.fromData(
+      bytes is List<int> ? Uint8List.fromList(bytes) : bytes,
+      mimeType: mime,
+      name: 'booruwave-${post.id}.${mime.split('/').last}',
+    );
+    await Share.shareXFiles([file], text: link, subject: 'BooruWave post');
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not prepare this post to share')),
+      );
+    }
+  }
+}
+
 class _BottomActions extends StatelessWidget {
   final Post post;
   final VoidCallback onDetailsToggle;
@@ -593,7 +674,7 @@ class _BottomActions extends StatelessWidget {
                 if (post.description?.isNotEmpty ?? false) ...[
                   const SizedBox(height: 10),
                   Text(
-                    post.description!,
+                    _cleanBooruDescription(post.description!),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -630,16 +711,12 @@ class _BottomActions extends StatelessWidget {
               _ActionButton(
                 icon: Icons.open_in_browser_rounded,
                 label: 'Source',
-                onTap: () {
-                  // Open in browser - url_launcher would go here
-                },
+                onTap: () => _openSource(context, post),
               ),
               _ActionButton(
                 icon: Icons.share_rounded,
                 label: 'Share',
-                onTap: () {
-                  // share_plus would go here
-                },
+                onTap: () => _sharePost(context, post),
               ),
               _ActionButton(
                 icon: Icons.tag_rounded,
@@ -731,12 +808,17 @@ class _ActionButton extends StatelessWidget {
 
 class _DetailsPanel extends StatelessWidget {
   final Post post;
-  const _DetailsPanel({required this.post});
+  final VoidCallback onDismiss;
+  const _DetailsPanel({required this.post, required this.onDismiss});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
+    return GestureDetector(
+      onVerticalDragEnd: (details) {
+        if ((details.primaryVelocity ?? 0) > 250) onDismiss();
+      },
+      child: Container(
       decoration: BoxDecoration(
         color: AppColors.darkSurface.withOpacity(0.97),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -790,7 +872,7 @@ class _DetailsPanel extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      post.description!,
+                      _cleanBooruDescription(post.description!),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: AppColors.textSecondary,
                       ),
@@ -801,6 +883,7 @@ class _DetailsPanel extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

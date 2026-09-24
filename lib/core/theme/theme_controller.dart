@@ -24,6 +24,7 @@ class ThemeController extends ChangeNotifier {
   AccentColor get accent => _accent;
   GlassThickness get glass => _glass;
   ThemePreset get preset => _preset;
+  bool get isOled => _isDark && _preset == ThemePreset.oled;
   Brightness get brightness => _isDark ? Brightness.dark : Brightness.light;
 
   Future<void> setDark(bool value) async {
@@ -54,6 +55,10 @@ class ThemeController extends ChangeNotifier {
   Future<void> setPreset(ThemePreset value) async {
     if (_preset == value) return;
     _preset = value;
+    if (value == ThemePreset.oled) {
+      _isDark = true;
+      await _repo.setDarkMode(true);
+    }
     _accent = value.suggestedAccent;
     await _repo.setThemePresetName(value.name);
     await _repo.setAccentColorName(_accent.name);

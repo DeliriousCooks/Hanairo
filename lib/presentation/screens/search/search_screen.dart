@@ -750,6 +750,7 @@ class _ResultsHeader extends StatelessWidget {
     final countSummary = state.tagCounts.entries
         .map((entry) => '${entry.key.shortName} ${_formatTagCount(entry.value)}')
         .join('  ·  ');
+    final combinedTagCount = state.tagCounts.values.fold<int>(0, (sum, count) => sum + count);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
       child: Column(
@@ -788,7 +789,7 @@ class _ResultsHeader extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 7),
               child: Text(
-                'Tag posts  ·  $countSummary',
+                'Across enabled sites  ·  ${_formatTagCount(combinedTagCount)} total  ·  $countSummary',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant.withOpacity(0.78),
                 ),

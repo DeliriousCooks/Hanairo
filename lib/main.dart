@@ -178,6 +178,7 @@ class _ThemeWrapper extends StatelessWidget {
             darkTheme: AppTheme.build(
               brightness: Brightness.dark,
               accent: _themeController.accent.color,
+              oled: _themeController.isOled,
             ),
             themeMode: _themeController.isDark ? ThemeMode.dark : ThemeMode.light,
             routerConfig: _router,
@@ -267,7 +268,7 @@ class _BottomNav extends StatelessWidget {
       child: GlassContainer(
         thickness: glass,
         borderRadius: BorderRadius.circular(28),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -314,31 +315,35 @@ class _NavItem extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        curve: Curves.easeOutBack,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 3),
         decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.88) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          color: selected ? color : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: selected ? [BoxShadow(color: color.withOpacity(0.38), blurRadius: 16, spreadRadius: -5)] : null,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               selected ? selectedIcon : icon,
-              size: 22,
+              size: selected ? 24 : 21,
               color: selected
                   ? Colors.white
                   : theme.colorScheme.onSurfaceVariant,
             ),
-            if (!selected) ...[
-              const SizedBox(height: 3),
-              Text(
-                label,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.clip,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: selected ? Colors.white : theme.colorScheme.onSurfaceVariant,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                fontSize: 9,
               ),
-            ],
+            ),
           ],
         ),
       ),

@@ -83,6 +83,12 @@ enum ThemePreset {
     suggestedAccent: AccentColor.teal,
     gradientDark: [Color(0xFF000000), Color(0xFF0D0D0D)],
     gradientLight: [Color(0xFFFAFAFA), Color(0xFFE8E8E8)],
+  ),
+  oled(
+    label: 'OLED Black',
+    suggestedAccent: AccentColor.violet,
+    gradientDark: [Color(0xFF000000), Color(0xFF000000)],
+    gradientLight: [Color(0xFFF5F5FA), Color(0xFFECEAF7)],
   );
 
   final String label;

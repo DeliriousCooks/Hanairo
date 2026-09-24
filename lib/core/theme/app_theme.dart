@@ -165,7 +165,7 @@ class AppTheme {
   /// Builds a full [ThemeData] for the given [brightness] using [accent] as
   /// the primary color. This replaces the old static darkTheme/lightTheme
   /// getters so the accent color picked in Settings applies everywhere.
-  static ThemeData build({required Brightness brightness, required Color accent}) {
+  static ThemeData build({required Brightness brightness, required Color accent, bool oled = false}) {
     final isDark = brightness == Brightness.dark;
     final accentLight = _adjustLightness(accent, 0.14);
     final accentDark = _adjustLightness(accent, -0.18);
@@ -174,7 +174,7 @@ class AppTheme {
         : Color.alphaBlend(accent.withOpacity(0.12), Colors.white);
 
     return isDark
-        ? _darkTheme(accent, accentLight, accentDark, accentContainer)
+        ? _darkTheme(accent, accentLight, accentDark, accentContainer, oled: oled)
         : _lightTheme(accent, accentLight, accentDark, accentContainer);
   }
 
@@ -183,11 +183,16 @@ class AppTheme {
     Color accentLight,
     Color accentDark,
     Color accentContainer,
+    {bool oled = false}
   ) {
+    final background = oled ? Colors.black : AppColors.darkBackground;
+    final surface = oled ? const Color(0xFF050505) : AppColors.darkSurface;
+    final card = oled ? const Color(0xFF0A0A0A) : AppColors.darkCard;
+    final border = oled ? const Color(0xFF202020) : AppColors.darkBorder;
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: AppColors.darkBackground,
+      scaffoldBackgroundColor: background,
       colorScheme: ColorScheme.dark(
         primary: accent,
         onPrimary: Colors.white,
@@ -196,13 +201,13 @@ class AppTheme {
         secondary: AppColors.secondary,
         onSecondary: Colors.black,
         secondaryContainer: AppColors.secondaryContainer,
-        surface: AppColors.darkSurface,
+        surface: surface,
         onSurface: AppColors.textPrimary,
         error: AppColors.error,
         onError: Colors.white,
-        outline: AppColors.darkBorder,
+        outline: border,
         outlineVariant: AppColors.darkDivider,
-        surfaceContainerHighest: AppColors.darkCard,
+        surfaceContainerHighest: card,
         onSurfaceVariant: AppColors.textSecondary,
       ),
       textTheme: _buildTextTheme(AppColors.textPrimary, AppColors.textSecondary),
@@ -224,7 +229,7 @@ class AppTheme {
         iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.darkSurface.withOpacity(0.95),
+        backgroundColor: surface.withOpacity(0.95),
         elevation: 0,
         indicatorColor: accentContainer,
         labelTextStyle: WidgetStateProperty.all(
@@ -238,17 +243,17 @@ class AppTheme {
         }),
       ),
       cardTheme: CardThemeData(
-        color: AppColors.darkCard,
+        color: card,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.darkBorder, width: 0.5),
+          side: BorderSide(color: border, width: 0.5),
         ),
         clipBehavior: Clip.antiAlias,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.darkCard,
+        fillColor: card,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.darkBorder, width: 0.5),
@@ -320,10 +325,10 @@ class AppTheme {
       ),
       extensions: [
         AppThemeExtension(
-          shimmerBase: const Color(0xFF1A1A26),
-          shimmerHighlight: const Color(0xFF2A2A40),
-          glassBackground: const Color(0x801A1A26),
-          glassBorder: const Color(0x402A2A40),
+          shimmerBase: oled ? const Color(0xFF080808) : const Color(0xFF1A1A26),
+          shimmerHighlight: oled ? const Color(0xFF151515) : const Color(0xFF2A2A40),
+          glassBackground: oled ? const Color(0xCC050505) : const Color(0x801A1A26),
+          glassBorder: oled ? const Color(0x50252525) : const Color(0x402A2A40),
           tagColors: {
             'general': const Color(0xFF7C8FFF),
             'artist': const Color(0xFFFF7CA0),
