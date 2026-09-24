@@ -256,7 +256,10 @@ class MainShell extends StatelessWidget {
           // so post grids and scroll views use the full screen height.
           extendBody: true,
           extendBodyBehindAppBar: true,
-          body: child,
+          body: _SwipeableTabBody(
+            onSwipe: (direction) => _navigateBySwipe(context, direction),
+            child: child,
+          ),
           resizeToAvoidBottomInset: true,
           bottomNavigationBar: MediaQuery.of(context).viewInsets.bottom > 0
               ? null
@@ -274,6 +277,54 @@ class MainShell extends StatelessWidget {
                 ),
         );
       },
+    );
+  }
+
+  void _navigateBySwipe(BuildContext context, int direction) {
+    final nextIndex = _indexForLocation(context) + direction;
+    if (nextIndex < 0 || nextIndex >= _routes.length) return;
+
+    final target = _routes[nextIndex];
+    if (GoRouterState.of(context).uri.path == target) return;
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    HapticFeedback.selectionClick();
+    context.go(target);
+  }
+}
+
+class _SwipeableTabBody extends StatefulWidget {
+  final Widget child;
+  final ValueChanged<int> onSwipe;
+
+  const _SwipeableTabBody({required this.child, required this.onSwipe});
+
+  @override
+  State<_SwipeableTabBody> createState() => _SwipeableTabBodyState();
+}
+
+class _SwipeableTabBodyState extends State<_SwipeableTabBody> {
+  double _dragDistance = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: (_) => _dragDistance = 0,
+      onHorizontalDragUpdate: (details) => _dragDistance += details.delta.dx,
+      onHorizontalDragCancel: () => _dragDistance = 0,
+      onHorizontalDragEnd: (details) {
+        final distance = _dragDistance;
+        final velocity = details.primaryVelocity ?? 0;
+        _dragDistance = 0;
+        if (distance.abs() < 72 && velocity.abs() < 300) return;
+        final direction = distance.abs() >= 72
+            ? (distance < 0 ? 1 : -1)
+            : (velocity < 0 ? 1 : -1);
+        widget.onSwipe(direction);
+      },
+      child: widget.child,
     );
   }
 }

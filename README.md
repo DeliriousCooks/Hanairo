@@ -1,3 +1,13 @@
+# BooruWave UI update v18
+
+This is the v18 source overlay, based on v17. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
+
+## v18 finishing fixes
+
+- Vertically moved the search field itself down 12 logical pixels inside its unchanged-height dock so its hint and typed text line up with the search and filter buttons.
+- Added horizontal swipes between the main tabs. A right swipe from Search returns to Feed; a left swipe moves to Favorites. The keyboard is dismissed during tab changes.
+- Added a Recent Searches list to the empty Search screen. Tap a previous query to run it again, or Clear to erase local search history.
+- Reset stale results on a fresh blank Search visit so the empty/recent state appears consistently.
 # BooruWave UI update v17
 
 This is the v17 source overlay, based on v16. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
@@ -82,5 +92,6 @@ Glass is limited to navigation and search controls so the art and feed content r
 - Fixed Gelbooru credentials to use User ID and API Key fields, and passed saved Rule34/Gelbooru credentials to search, tag-count, and suggestion requests.
 
 Rule34 currently requires API credentials for API search requests. Gelbooru may require them at times. The auth screens explain where to retrieve each site's credentials.
+
 
 

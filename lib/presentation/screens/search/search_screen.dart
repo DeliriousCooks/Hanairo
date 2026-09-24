@@ -49,6 +49,12 @@ class _SearchScreenState extends State<SearchScreen>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _submitSearch();
       });
+    } else {
+      // A fresh visit to Search should show its idle state and recent queries,
+      // rather than stale results left in the shared SearchBloc.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.read<SearchBloc>().add(SearchCleared());
+      });
     }
 
     _inputController.addListener(() {
@@ -163,6 +169,16 @@ class _SearchScreenState extends State<SearchScreen>
     });
   }
 
+  void _openRecentSearch(String query) {
+    _inputFocus.unfocus();
+    context.go('/search?q=${Uri.encodeQueryComponent(query)}');
+  }
+
+  Future<void> _clearRecentSearches() async {
+    await context.read<LocalRepository>().clearSearchHistory();
+    if (mounted) setState(() {});
+  }
+
   void _submitSearch() {
     // Combine chips + any partial input text
     final allTags = [..._tagChips];
@@ -212,6 +228,14 @@ class _SearchScreenState extends State<SearchScreen>
                 // letting it overlap source filters or the results beneath.
                 final headerHeight =
                     topPad + (_tagChips.isEmpty ? 80 : 120);
+                final showRecentSearches =
+                    state.status == SearchStatus.initial &&
+                    _tagChips.isEmpty &&
+                    _inputText.isEmpty &&
+                    !_showSuggestions;
+                final recentSearches = showRecentSearches
+                    ? context.read<LocalRepository>().getSearchHistory()
+                    : const <String>[];
 
                 return CustomScrollView(
                   controller: _scrollController,
@@ -230,6 +254,14 @@ class _SearchScreenState extends State<SearchScreen>
                     SliverToBoxAdapter(
                       child: _SourceChips(state: state),
                     ),
+                    if (recentSearches.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: _RecentSearchesSection(
+                          searches: recentSearches,
+                          onSelected: _openRecentSearch,
+                          onClear: _clearRecentSearches,
+                        ),
+                      ),
                     if (state.tagString.trim().isNotEmpty)
                       SliverToBoxAdapter(
                         child: _TranslatedQueries(state: state),
@@ -243,7 +275,8 @@ class _SearchScreenState extends State<SearchScreen>
                       ),
 
                     // Content
-                    if (state.status == SearchStatus.initial)
+                    if (state.status == SearchStatus.initial &&
+                        recentSearches.isEmpty)
                       const SliverFillRemaining(child: _EmptyState())
                     else if (state.status == SearchStatus.loading)
                       const SliverToBoxAdapter(child: _LoadingGrid())
@@ -515,45 +548,47 @@ class _TagChipInput extends StatelessWidget {
       children: [
         SizedBox(
           height: 48,
-          child: TextField(
-            controller: inputController,
-            focusNode: inputFocus,
-            // Flutter centers the input line box, but the visible glyphs sit
-            // noticeably high in this compact glass dock. Bias the line down
-            // slightly so the placeholder and typed text look optically centered.
-            textAlignVertical: const TextAlignVertical(y: 0.75),
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurface,
-              fontSize: 16,
-            ),
-            decoration: InputDecoration(
-              isDense: true,
-              // The global input theme fills fields with the card color. Keep
-              // this inline search field transparent so the hint and query sit
-              // directly on the floating glass search surface.
-              filled: false,
-              fillColor: Colors.transparent,
-              hintText: 'Search tags…',
-              hintStyle: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+          child: Transform.translate(
+            // Keep the dock's measured height unchanged while moving the
+            // complete input line down to the visual center of the control.
+            offset: const Offset(0, 12),
+            child: TextField(
+              controller: inputController,
+              focusNode: inputFocus,
+              textAlignVertical: TextAlignVertical.center,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.colorScheme.onSurface,
                 fontSize: 16,
               ),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              disabledBorder: InputBorder.none,
-              errorBorder: InputBorder.none,
-              focusedErrorBorder: InputBorder.none,
-              contentPadding: EdgeInsets.zero,
+              decoration: InputDecoration(
+                isDense: true,
+                // The global input theme fills fields with the card color. Keep
+                // this inline search field transparent so the hint and query sit
+                // directly on the floating glass search surface.
+                filled: false,
+                fillColor: Colors.transparent,
+                hintText: 'Search tags…',
+                hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                  fontSize: 16,
+                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+              textInputAction: TextInputAction.search,
+              onSubmitted: onSubmitted,
+              // Space adds the completed word as a chip; Enter submits the query.
+              onChanged: (value) {
+                if (value.endsWith(' ') && value.trim().isNotEmpty) {
+                  onTagAdded(value.trim());
+                }
+              },
             ),
-            textInputAction: TextInputAction.search,
-            onSubmitted: onSubmitted,
-            // Space adds the completed word as a chip; Enter submits the query.
-            onChanged: (value) {
-              if (value.endsWith(' ') && value.trim().isNotEmpty) {
-                onTagAdded(value.trim());
-              }
-            },
           ),
         ),
         if (tagChips.isNotEmpty) ...[
@@ -1142,6 +1177,91 @@ class _TranslatedQueries extends StatelessWidget {
 
 // ─── Empty / Loading / Error States ──────────────────────────────────────
 
+class _RecentSearchesSection extends StatelessWidget {
+  final List<String> searches;
+  final ValueChanged<String> onSelected;
+  final VoidCallback onClear;
+
+  const _RecentSearchesSection({
+    required this.searches,
+    required this.onSelected,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.history_rounded,
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text('Recent searches', style: theme.textTheme.titleMedium),
+              const Spacer(),
+              TextButton(
+                onPressed: onClear,
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                child: const Text('Clear'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          for (final query in searches.take(8))
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => onSelected(query),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 11,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.history_rounded,
+                        size: 17,
+                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          query.replaceAll('_', ' '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.north_west_rounded,
+                        size: 16,
+                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.55),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
 
@@ -1175,7 +1295,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Type a tag above and press enter,\nor tap a suggestion to search',
+              'Type a tag above and press enter,\nor tap a suggestion to add it',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
