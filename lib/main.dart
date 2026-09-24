@@ -263,29 +263,37 @@ class _BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SafeArea(
-      minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: GlassContainer(
-        thickness: glass,
-        borderRadius: BorderRadius.circular(28),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            for (var i = 0; i < _items.length; i++)
-              Expanded(
-                child: Center(
-                  child: _NavItem(
-                  icon: _items[i].icon,
-                  selectedIcon: _items[i].selectedIcon,
-                  label: _items[i].label,
-                  selected: i == selectedIndex,
-                  color: theme.colorScheme.primary,
-                  onTap: () => onDestinationSelected(i),
+    return Align(
+      alignment: Alignment.bottomCenter,
+      heightFactor: 1,
+      child: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: SizedBox(
+          height: 76,
+          child: GlassContainer(
+            thickness: glass,
+            borderRadius: BorderRadius.circular(28),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.max,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                for (var i = 0; i < _items.length; i++)
+                  Expanded(
+                    child: Center(
+                      child: _NavItem(
+                        icon: _items[i].icon,
+                        selectedIcon: _items[i].selectedIcon,
+                        label: _items[i].label,
+                        selected: i == selectedIndex,
+                        color: theme.colorScheme.primary,
+                        onTap: () => onDestinationSelected(i),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
