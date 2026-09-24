@@ -525,6 +525,11 @@ class _TagChipInput extends StatelessWidget {
             ),
             decoration: InputDecoration(
               isDense: true,
+              // The global input theme fills fields with the card color. Keep
+              // this inline search field transparent so the hint and query sit
+              // directly on the floating glass search surface.
+              filled: false,
+              fillColor: Colors.transparent,
               hintText: 'Search tags…',
               hintStyle: theme.textTheme.bodyLarge?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
