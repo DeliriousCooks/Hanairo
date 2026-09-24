@@ -41,13 +41,18 @@ class _FeedScreenState extends State<FeedScreen> {
   _FeedOrder _order = _FeedOrder.popular;
   _FeedMode _feedMode = _FeedMode.fresh;
   _FeedLayout _layout = _FeedLayout.grid;
+  int _gridColumns = 2;
+  late LocalRepository _localRepository;
   bool _loading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _layout = context.read<LocalRepository>().getSetting<String>(
+    _localRepository = context.read<LocalRepository>();
+    _gridColumns = _localRepository.getGridColumns();
+    _localRepository.gridColumnsRevision.addListener(_onGridColumnsChanged);
+    _layout = _localRepository.getSetting<String>(
                   'feed_layout',
                   'grid',
                 ) ==
@@ -55,6 +60,17 @@ class _FeedScreenState extends State<FeedScreen> {
         ? _FeedLayout.single
         : _FeedLayout.grid;
     _loadFeed();
+  }
+
+  @override
+  void dispose() {
+    _localRepository.gridColumnsRevision.removeListener(_onGridColumnsChanged);
+    super.dispose();
+  }
+
+  void _onGridColumnsChanged() {
+    final columns = _localRepository.getGridColumns();
+    if (mounted && columns != _gridColumns) setState(() => _gridColumns = columns);
   }
 
   Future<void> _loadFeed() async {
@@ -471,6 +487,33 @@ class _FeedScreenState extends State<FeedScreen> {
                 ]),
               ),
             ),
+            if (_layout == _FeedLayout.grid)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                  child: Row(
+                    children: [
+                      Text('Grid columns', style: theme.textTheme.labelLarge),
+                      const Spacer(),
+                      SegmentedButton<int>(
+                        showSelectedIcon: false,
+                        style: const ButtonStyle(
+                          visualDensity: VisualDensity.compact,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        segments: const [
+                          ButtonSegment(value: 2, label: Text('2')),
+                          ButtonSegment(value: 3, label: Text('3')),
+                          ButtonSegment(value: 4, label: Text('4')),
+                        ],
+                        selected: {_gridColumns},
+                        onSelectionChanged: (selection) =>
+                            _setGridColumns(selection.first),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             SliverToBoxAdapter(
               child: SizedBox(
                 height: 48,
@@ -611,19 +654,23 @@ class _FeedScreenState extends State<FeedScreen> {
                 ),
               )
             else ...[
-              PostGridSliver(
-                key: ValueKey(
-                    '${_feedMode.name}-${_layout.name}-${_order.name}-${_sourceFilter?.name}'),
-                posts: visible,
-                columns: _layout == _FeedLayout.grid ? 2 : 1,
-                onFavoriteTapped: _toggleFavorite,
-                onPostTapped: (post, index) {
-                  context.push('/viewer', extra: {
-                    'posts': visible,
-                    'index': index,
-                  });
-                },
-              ),
+              if (_layout == _FeedLayout.grid)
+                PostGridSliver(
+                  key: ValueKey(
+                      '${_feedMode.name}-${_layout.name}-$_gridColumns-${_order.name}-${_sourceFilter?.name}'),
+                  posts: visible,
+                  columns: _gridColumns,
+                  onFavoriteTapped: _toggleFavorite,
+                  onPostTapped: _openViewer,
+                )
+              else
+                SinglePostFeedSliver(
+                  key: ValueKey(
+                      '${_feedMode.name}-${_layout.name}-${_order.name}-${_sourceFilter?.name}'),
+                  posts: visible,
+                  onFavoriteTapped: _toggleFavorite,
+                  onPostTapped: _openViewer,
+                ),
               const SliverToBoxAdapter(child: SizedBox(height: 112)),
             ],
           ],
@@ -658,6 +705,20 @@ class _FeedScreenState extends State<FeedScreen> {
           layout.name,
         );
     HapticFeedback.selectionClick();
+  }
+
+  Future<void> _setGridColumns(int columns) async {
+    final safeColumns = columns.clamp(2, 4).toInt();
+    if (_gridColumns == safeColumns) return;
+    await _localRepository.setGridColumns(safeColumns);
+    if (!mounted) return;
+    setState(() => _gridColumns = safeColumns);
+    HapticFeedback.selectionClick();
+  }
+
+  void _openViewer(Post post, int index) {
+    final visible = _visiblePosts;
+    context.push('/viewer', extra: {'posts': visible, 'index': index});
   }
 }
 

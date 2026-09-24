@@ -11,6 +11,7 @@ class LiquidGlassSurface extends StatelessWidget {
   final BorderRadius borderRadius;
   final double sigma;
   final EdgeInsetsGeometry? padding;
+  final bool highContrast;
 
   const LiquidGlassSurface({
     super.key,
@@ -18,6 +19,7 @@ class LiquidGlassSurface extends StatelessWidget {
     this.borderRadius = const BorderRadius.all(Radius.circular(22)),
     this.sigma = 18,
     this.padding,
+    this.highContrast = false,
   });
 
   @override
@@ -28,7 +30,9 @@ class LiquidGlassSurface extends StatelessWidget {
     final fill = isDark
         ? (isOled ? const Color(0xFF08080A) : const Color(0xFF17151E))
         : const Color(0xFFFDFBFF);
-    final fillOpacity = isDark ? (isOled ? 0.82 : 0.60) : 0.62;
+    final fillOpacity = highContrast
+        ? (isDark ? (isOled ? 0.96 : 0.90) : 0.9)
+        : (isDark ? (isOled ? 0.82 : 0.60) : 0.62);
     final edge = isDark
         ? Colors.white.withOpacity(isOled ? 0.20 : 0.24)
         : Colors.white.withOpacity(0.78);
@@ -58,12 +62,12 @@ class LiquidGlassSurface extends StatelessWidget {
                 end: Alignment.bottomRight,
                 colors: isDark
                     ? [
-                        Colors.white.withOpacity(0.10),
-                        Colors.white.withOpacity(0.015),
+                        Colors.white.withOpacity(highContrast ? 0.035 : 0.10),
+                        Colors.white.withOpacity(highContrast ? 0.008 : 0.015),
                       ]
                     : [
-                        Colors.white.withOpacity(0.70),
-                        Colors.white.withOpacity(0.22),
+                        Colors.white.withOpacity(highContrast ? 0.22 : 0.70),
+                        Colors.white.withOpacity(highContrast ? 0.08 : 0.22),
                       ],
               ),
               border: Border.all(color: edge, width: 0.8),

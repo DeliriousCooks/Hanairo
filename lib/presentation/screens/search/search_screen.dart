@@ -145,12 +145,10 @@ class _SearchScreenState extends State<SearchScreen>
             // ─── Main scrollable content ──────────────────────────────────
             BlocBuilder<SearchBloc, SearchState>(
               builder: (context, state) {
-                // Dynamic header height based on chip count
-                final chipsRows = (_tagChips.length / 3).ceil();
-                final headerHeight = topPad +
-                    56 + // search bar height
-                    (chipsRows > 0 ? (chipsRows * 32 + 8).toDouble() : 0) +
-                    8;
+                // The floating glass search dock has fixed height; its tag
+                // chips scroll horizontally inside the input rather than
+                // growing over the results beneath it.
+                final headerHeight = topPad + 80;
 
                 return CustomScrollView(
                   controller: _scrollController,
@@ -210,28 +208,33 @@ class _SearchScreenState extends State<SearchScreen>
                         ),
                       )
                     else ...[
-                      PostGridSliver(
-                        // Stable key: only rebuild when posts list actually
-                        // changes identity (prevents grid reflow on
-                        // unrelated state updates like loadingMore status)
-                        key: ValueKey(state.posts.length),
-                        posts: state.posts,
-                          columns: context
-                              .read<LocalRepository>()
-                              .getGridColumns(),
-                          onFavoriteTapped: (post) => context
-                              .read<SearchBloc>()
-                              .add(PostFavoriteToggled(post)),
-                          onPostTapped: (post, index) {
-                          _inputFocus.unfocus();
-                          FocusScope.of(context).unfocus();
-                          SystemChannels.textInput.invokeMethod<void>(
-                            'TextInput.hide',
+                      ValueListenableBuilder<int>(
+                        valueListenable: context
+                            .read<LocalRepository>()
+                            .gridColumnsRevision,
+                        builder: (context, _, __) {
+                          final local = context.read<LocalRepository>();
+                          return PostGridSliver(
+                            // Keep the same grid instance while a pagination
+                            // status changes; update its column preference live.
+                            key: ValueKey(state.posts.length),
+                            posts: state.posts,
+                            columns: local.getGridColumns(),
+                            onFavoriteTapped: (post) => context
+                                .read<SearchBloc>()
+                                .add(PostFavoriteToggled(post)),
+                            onPostTapped: (post, index) {
+                              _inputFocus.unfocus();
+                              FocusScope.of(context).unfocus();
+                              SystemChannels.textInput.invokeMethod<void>(
+                                'TextInput.hide',
+                              );
+                              context.push('/viewer', extra: {
+                                'posts': state.posts,
+                                'index': index,
+                              });
+                            },
                           );
-                          context.push('/viewer', extra: {
-                            'posts': state.posts,
-                            'index': index,
-                          });
                         },
                       ),
                       if (state.status == SearchStatus.loadingMore)
@@ -330,35 +333,45 @@ class _FloatingSearchHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Main search bar container
-          LiquidGlassSurface(
-            sigma: 20,
-            borderRadius: BorderRadius.vertical(
-              bottom: Radius.circular(showSuggestions ? 16 : 22),
-            ),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(14, topPad + 10, 14, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Input row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _TagChipInput(
-                          tagChips: tagChips,
-                          inputController: inputController,
-                          inputFocus: inputFocus,
-                          onTagRemoved: onTagRemoved,
-                          onTagAdded: onTagAdded,
-                          onSubmitted: onSubmitted,
+          Padding(
+            padding: EdgeInsets.fromLTRB(14, topPad + 8, 14, 0),
+            child: LiquidGlassSurface(
+              sigma: 18,
+              highContrast: true,
+              borderRadius: BorderRadius.circular(28),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.26),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      _FilterButton(onTap: onFilterTapped),
-                    ],
-                  ),
-                ],
+                      child: Icon(Icons.search_rounded,
+                          size: 23,
+                          color: Theme.of(context).colorScheme.primary),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _TagChipInput(
+                        tagChips: tagChips,
+                        inputController: inputController,
+                        inputFocus: inputFocus,
+                        onTagRemoved: onTagRemoved,
+                        onTagAdded: onTagAdded,
+                        onSubmitted: onSubmitted,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterButton(onTap: onFilterTapped),
+                  ],
+                ),
               ),
             ),
           ),
@@ -371,10 +384,13 @@ class _FloatingSearchHeader extends StatelessWidget {
                   p.tagSuggestionCounts != c.tagSuggestionCounts,
               builder: (context, state) {
                 if (state.tagSuggestions.isEmpty) return const SizedBox();
-                return _SuggestionsDropdown(
-                  suggestions: state.tagSuggestions,
-                  counts: state.tagSuggestionCounts,
-                  onSelected: onSuggestionSelected,
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
+                  child: _SuggestionsDropdown(
+                    suggestions: state.tagSuggestions,
+                    counts: state.tagSuggestionCounts,
+                    onSelected: onSuggestionSelected,
+                  ),
                 );
               },
             ),
@@ -410,56 +426,58 @@ class _TagChipInput extends StatelessWidget {
     return GestureDetector(
       onTap: () => inputFocus.requestFocus(),
       child: Container(
-        constraints: const BoxConstraints(minHeight: 44),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withOpacity(
-            theme.brightness == Brightness.dark ? 0.55 : 0.42,
+          color: theme.colorScheme.surface.withOpacity(
+            theme.brightness == Brightness.dark ? 0.84 : 0.9,
           ),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: theme.colorScheme.outline.withOpacity(0.2),
-            width: 0.5,
+            color: theme.colorScheme.primary.withOpacity(0.26),
+            width: 0.8,
           ),
         ),
-        child: Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        child: Row(
           children: [
-            // Search icon
-            Icon(
-              Icons.search_rounded,
-              size: 18,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            // Tag chips
-            for (final tag in tagChips)
-              _TagChip(
-                tag: tag,
-                onRemove: () => onTagRemoved(tag),
-              ),
-            // Text input
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  minWidth: tagChips.isEmpty ? 220 : 150,
-                  maxWidth: 320,
+            if (tagChips.isNotEmpty) ...[
+              Flexible(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final tag in tagChips)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: _TagChip(
+                            tag: tag,
+                            onRemove: () => onTagRemoved(tag),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-                child: TextField(
+              ),
+            ],
+            Expanded(
+              child: TextField(
                   controller: inputController,
                   focusNode: inputFocus,
                   textAlignVertical: TextAlignVertical.center,
-                style: theme.textTheme.bodyLarge?.copyWith(
+                  style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurface,
+                  fontSize: 16,
                 ),
                 decoration: InputDecoration(
                   isDense: true,
                   hintText: tagChips.isEmpty ? 'Search tags...' : 'Add tag...',
                   hintStyle: theme.textTheme.bodyLarge?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                    fontSize: 16,
                   ),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
                 textInputAction: TextInputAction.search,
                 onSubmitted: (v) {
@@ -475,7 +493,6 @@ class _TagChipInput extends StatelessWidget {
                     onTagAdded(v.trim());
                   }
                 },
-              ),
             ),
           ],
         ),
@@ -494,11 +511,11 @@ class _TagChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      height: 26,
-      padding: const EdgeInsets.only(left: 10, right: 4),
+      height: 34,
+      padding: const EdgeInsets.only(left: 10, right: 5),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(8),
+        color: theme.colorScheme.primaryContainer.withOpacity(0.88),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: theme.colorScheme.primary.withOpacity(0.3),
           width: 0.5,
@@ -507,11 +524,16 @@ class _TagChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            tag.replaceAll('_', ' '),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w600,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 160),
+            child: Text(
+              tag.replaceAll('_', ' '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(width: 4),
@@ -556,15 +578,15 @@ class _FilterButton extends StatelessWidget {
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            width: 44,
-            height: 44,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               color: hasFilters
                   ? theme.colorScheme.primaryContainer
                   : theme.colorScheme.surfaceContainerHighest.withOpacity(
                       theme.brightness == Brightness.dark ? 0.48 : 0.36,
                     ),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: hasFilters
                     ? theme.colorScheme.primary.withOpacity(0.4)
@@ -619,14 +641,18 @@ class _SuggestionsDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.12),
-            width: 0.5,
+        color: theme.colorScheme.surface.withOpacity(0.97),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
-        ),
+        ],
       ),
       constraints: const BoxConstraints(maxHeight: 220),
       child: ListView.builder(

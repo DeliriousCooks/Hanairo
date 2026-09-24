@@ -18,6 +18,7 @@ class LocalRepository {
   final _secureStorage = const FlutterSecureStorage();
   final ValueNotifier<int> favoritesRevision = ValueNotifier<int>(0);
   final ValueNotifier<int> favoriteTagsRevision = ValueNotifier<int>(0);
+  final ValueNotifier<int> gridColumnsRevision = ValueNotifier<int>(0);
 
   Future<void> init() async {
     await Hive.initFlutter();
@@ -164,8 +165,11 @@ class LocalRepository {
   }
 
   // Grid columns
-  int getGridColumns() => getSetting<int>('grid_columns', 3);
-  Future<void> setGridColumns(int cols) => setSetting('grid_columns', cols);
+  int getGridColumns() => getSetting<int>('grid_columns', 2).clamp(2, 4).toInt();
+  Future<void> setGridColumns(int cols) async {
+    await setSetting<int>('grid_columns', cols.clamp(2, 4).toInt());
+    gridColumnsRevision.value++;
+  }
 
   // Theme
   bool isDarkMode() => getSetting<bool>('dark_mode', true);

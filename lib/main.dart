@@ -304,14 +304,15 @@ class _BottomNav extends StatelessWidget {
       alignment: Alignment.bottomCenter,
       heightFactor: 1,
       child: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        minimum: const EdgeInsets.fromLTRB(12, 0, 12, 8),
         child: LiquidGlassSurface(
-          sigma: glass.sigma,
+          sigma: glass.sigma.clamp(12.0, 18.0).toDouble(),
+          highContrast: true,
           borderRadius: BorderRadius.circular(27),
           child: SizedBox(
-            height: 74,
+            height: 78,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
               child: Row(
                 mainAxisSize: MainAxisSize.max,
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -359,7 +360,7 @@ class _NavItem extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final activeBackground = isDark
-        ? color.withOpacity(0.88)
+        ? color.withOpacity(0.94)
         : color.withOpacity(0.14);
     final activeForeground = isDark ? Colors.white : color;
     return GestureDetector(
@@ -374,8 +375,8 @@ class _NavItem extends StatelessWidget {
             child: AnimatedContainer(
               // Every selected tab gets the same compact footprint. This
               // prevents the highlight from filling its whole flex slot.
-              width: 64,
-              height: 58,
+              width: 68,
+              height: 64,
               alignment: Alignment.center,
               duration: const Duration(milliseconds: 190),
               curve: Curves.easeOutCubic,
@@ -391,23 +392,25 @@ class _NavItem extends StatelessWidget {
                 children: [
                   Icon(
                     selected ? selectedIcon : icon,
-                    size: selected ? 22 : 20,
+                    size: selected ? 22 : 21,
                     color: selected
                         ? activeForeground
-                        : theme.colorScheme.onSurfaceVariant,
+                        : theme.colorScheme.onSurface.withOpacity(0.82),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    label,
-                    maxLines: 1,
-                    softWrap: false,
-                    overflow: TextOverflow.clip,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: selected
-                          ? activeForeground
-                          : theme.colorScheme.onSurfaceVariant,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                      fontSize: 9,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: selected
+                            ? activeForeground
+                            : theme.colorScheme.onSurface.withOpacity(0.82),
+                        fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                        fontSize: 10,
+                      ),
                     ),
                   ),
                 ],

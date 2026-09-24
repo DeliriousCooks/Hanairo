@@ -1,6 +1,15 @@
-# BooruWave UI update v13
+# BooruWave UI update v14
 
 This is a source overlay for the existing Flutter app. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
+
+## Changes in v14
+
+- Reworked Search into a more substantial floating glass dock: separate search and filter controls, a roomy inset query field, horizontally scrolling tag chips, and rounded suggestions.
+- Increased tab dock contrast and label legibility so the icons and names stay clear against changing content behind the glass.
+- Added Posts and Favorite Tags sections to Favorites. Tap a post tag to search it; press and hold briefly to save or remove it from Favorite Tags.
+- Added a persistent 2 / 3 / 4 column control to Feed, sharing the saved Grid Columns preference with Settings and Favorites. The default remains the existing two-column feed.
+- Added a single-post feed mode that loads the original image URL and fits the complete image inside the media area. Double-tap to favorite and press and hold to export an image or video to Photos.
+- Reused the Photos export helper in both the single-post feed and full-screen viewer, including the existing WebM-to-MP4 conversion path.
 
 ## Changes in v13
 

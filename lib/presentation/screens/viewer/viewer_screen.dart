@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,13 +5,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
-import 'package:ffmpeg_kit_flutter_new_full/ffmpeg_kit.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/media_saver.dart';
 import '../../../domain/entities/post.dart';
 import '../../../data/repositories/local_repository.dart';
 import '../../blocs/search_bloc.dart';
@@ -562,52 +559,6 @@ String _sourcePostUrl(Post post) {
   }
 }
 
-Future<void> _savePostMedia(BuildContext context, Post post) async {
-  final url = post.fileUrl ?? post.sampleUrl ?? post.previewUrl;
-  if (url == null || url.isEmpty) throw StateError('No media URL is available');
-
-  final uri = Uri.parse(url);
-  final pathName = uri.pathSegments.isEmpty ? '' : uri.pathSegments.last;
-  final extension = pathName.contains('.')
-      ? pathName.split('.').last.toLowerCase()
-      : (post.isVideo ? 'mp4' : 'jpg');
-  final temp = await getTemporaryDirectory();
-  final inputPath = '${temp.path}/booruwave-${post.id}.$extension';
-  await Dio().download(
-    url,
-    inputPath,
-    options: Options(receiveTimeout: const Duration(minutes: 3)),
-  );
-
-  var pathToSave = inputPath;
-  if (post.isVideo && extension == 'webm') {
-    final mp4Path = '${temp.path}/booruwave-${post.id}.mp4';
-    final encoder = Platform.isIOS ? 'h264_videotoolbox' : 'h264_mediacodec';
-    var session = await FFmpegKit.execute(
-      '-y -i "$inputPath" -c:v $encoder -c:a aac -movflags +faststart "$mp4Path"',
-    );
-    var returnCode = await session.getReturnCode();
-    if (returnCode?.isValueSuccess() != true) {
-      session = await FFmpegKit.execute(
-        '-y -i "$inputPath" -c:v mpeg4 -c:a aac -movflags +faststart "$mp4Path"',
-      );
-      returnCode = await session.getReturnCode();
-    }
-    final converted = File(mp4Path);
-    if (returnCode?.isValueSuccess() != true ||
-        !await converted.exists() ||
-        await converted.length() == 0) {
-      throw StateError('Could not convert this WebM video to MP4');
-    }
-    pathToSave = mp4Path;
-  }
-
-  final result = await ImageGallerySaver.saveFile(pathToSave);
-  if (result is Map && result['isSuccess'] != true && result['success'] != true) {
-    throw StateError('The photo library did not accept this file');
-  }
-}
-
 Future<void> _openSource(BuildContext context, Post post) async {
   final uri = Uri.tryParse(_sourcePostUrl(post));
   if (uri != null && await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
@@ -822,7 +773,7 @@ class _DownloadActionState extends State<_DownloadAction> {
     if (_saving) return;
     setState(() => _saving = true);
     try {
-      await _savePostMedia(context, widget.post);
+      await savePostMedia(widget.post);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -1194,6 +1145,13 @@ class _TagsSection extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
+        const SizedBox(height: 4),
+        Text(
+          'Tap to search · press and hold to favorite',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
         const SizedBox(height: 12),
         ...tagsByCategory.entries.map((entry) {
           final color = ext?.tagColors[entry.key] ?? AppColors.textSecondary;
@@ -1216,29 +1174,63 @@ class _TagsSection extends StatelessWidget {
                   spacing: 6,
                   runSpacing: 6,
                   children: entry.value.map((tag) {
-                    return GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        // Navigate to search with this tag
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 9, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                              color: color.withOpacity(0.2), width: 0.5),
-                        ),
-                        child: Text(
-                          tag.displayName,
-                          style: TextStyle(
-                            color: color,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                    final local = context.read<LocalRepository>();
+                    return ValueListenableBuilder<int>(
+                      valueListenable: local.favoriteTagsRevision,
+                      builder: (context, _, __) {
+                        final isSaved = local.isFavoriteTag(tag.name);
+                        return GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            context.go(
+                              '/search?q=${Uri.encodeQueryComponent(tag.name)}',
+                            );
+                          },
+                          onLongPress: () async {
+                            HapticFeedback.mediumImpact();
+                            await local.toggleFavoriteTag(tag.name);
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(SnackBar(
+                                content: Text(isSaved
+                                    ? 'Removed ${tag.displayName} from favorite tags'
+                                    : 'Saved ${tag.displayName} to favorite tags'),
+                                duration: const Duration(seconds: 1),
+                              ));
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 9, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(isSaved ? 0.18 : 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: color.withOpacity(isSaved ? 0.44 : 0.2),
+                                  width: isSaved ? 1 : 0.5),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  tag.displayName,
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (isSaved) ...[
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.bookmark_rounded,
+                                      size: 11, color: color),
+                                ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     );
                   }).toList(),
                 ),
