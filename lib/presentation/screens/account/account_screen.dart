@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_settings.dart';
 import '../../../data/repositories/local_repository.dart';
+import '../../../domain/entities/post.dart';
 import '../../../main.dart' show ThemeScope;
 import '../../widgets/common/glass_container.dart';
 import '../../widgets/common/page_background.dart';
