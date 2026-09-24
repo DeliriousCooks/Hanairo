@@ -562,7 +562,7 @@ Future<void> _sharePost(BuildContext context, Post post) async {
         : lowerUrl.contains('.webp') ? 'image/webp'
         : lowerUrl.contains('.gif') ? 'image/gif' : 'image/jpeg';
     final file = XFile.fromData(
-      bytes is List<int> ? Uint8List.fromList(bytes) : bytes,
+      Uint8List.fromList(bytes),
       mimeType: mime,
       name: 'booruwave-${post.id}.${mime.split('/').last}',
     );
