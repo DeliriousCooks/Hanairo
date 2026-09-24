@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoPage;
 import 'package:flutter/services.dart';
-import 'dart:ui' show ImageFilter;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'core/theme/app_theme.dart';
@@ -18,6 +17,7 @@ import 'presentation/screens/account/account_screen.dart';
 import 'presentation/screens/settings/settings_screen.dart';
 import 'presentation/screens/auth/auth_screen.dart';
 import 'domain/entities/post.dart';
+import 'presentation/widgets/common/liquid_glass_surface.dart';
 
 final _localRepo = LocalRepository();
 final _searchRepo = SearchRepository();
@@ -266,7 +266,10 @@ class MainShell extends StatelessWidget {
                   onDestinationSelected: (index) {
                     final current = GoRouterState.of(context).uri.path;
                     final target = _routes[index];
-                    if (current != target) context.go(target);
+                    if (current != target) {
+                      HapticFeedback.selectionClick();
+                      context.go(target);
+                    }
                   },
                 ),
         );
@@ -302,22 +305,12 @@ class _BottomNav extends StatelessWidget {
       heightFactor: 1,
       child: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: glass.sigma, sigmaY: glass.sigma),
-            child: Container(
-              height: 76,
-              decoration: BoxDecoration(
-                // Keep the dock surface opaque enough that the page's colored
-                // background cannot bleed together under every tab item.
-                color: theme.colorScheme.surface.withOpacity(0.94),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: theme.colorScheme.outline.withOpacity(0.38),
-                  width: 1,
-                ),
-              ),
+        child: LiquidGlassSurface(
+          sigma: glass.sigma,
+          borderRadius: BorderRadius.circular(27),
+          child: SizedBox(
+            height: 74,
+            child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
               child: Row(
                 mainAxisSize: MainAxisSize.max,
@@ -364,6 +357,11 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final activeBackground = isDark
+        ? color.withOpacity(0.88)
+        : color.withOpacity(0.14);
+    final activeForeground = isDark ? Colors.white : color;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -382,8 +380,11 @@ class _NavItem extends StatelessWidget {
               duration: const Duration(milliseconds: 190),
               curve: Curves.easeOutCubic,
               decoration: BoxDecoration(
-                color: selected ? color : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
+                color: selected ? activeBackground : Colors.transparent,
+                borderRadius: BorderRadius.circular(18),
+                border: selected
+                    ? Border.all(color: color.withOpacity(isDark ? 0.22 : 0.18))
+                    : null,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -392,7 +393,7 @@ class _NavItem extends StatelessWidget {
                     selected ? selectedIcon : icon,
                     size: selected ? 22 : 20,
                     color: selected
-                        ? Colors.white
+                        ? activeForeground
                         : theme.colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(height: 2),
@@ -403,7 +404,7 @@ class _NavItem extends StatelessWidget {
                     overflow: TextOverflow.clip,
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: selected
-                          ? Colors.white
+                          ? activeForeground
                           : theme.colorScheme.onSurfaceVariant,
                       fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                       fontSize: 9,

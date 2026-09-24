@@ -14,6 +14,8 @@ import '../../widgets/grid/post_grid.dart';
 import '../../../main.dart' show ThemeScope;
 
 enum _FeedOrder { popular, latest }
+enum _FeedMode { fresh, savedTags }
+enum _FeedLayout { grid, single }
 
 bool _sourceRequiresCredentials(BooruSource source, String? error) {
   if (source != BooruSource.rule34xxx && source != BooruSource.gelbooru) {
@@ -37,12 +39,21 @@ class _FeedScreenState extends State<FeedScreen> {
   Map<BooruSource, String> _sourceErrors = const {};
   BooruSource? _sourceFilter;
   _FeedOrder _order = _FeedOrder.popular;
+  _FeedMode _feedMode = _FeedMode.fresh;
+  _FeedLayout _layout = _FeedLayout.grid;
   bool _loading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _layout = context.read<LocalRepository>().getSetting<String>(
+                  'feed_layout',
+                  'grid',
+                ) ==
+            'single'
+        ? _FeedLayout.single
+        : _FeedLayout.grid;
     _loadFeed();
   }
 
@@ -66,12 +77,50 @@ class _FeedScreenState extends State<FeedScreen> {
         throw StateError('Choose at least one booru source in Settings.');
       }
 
-      final result = await search.searchPerSourceDetailed(SearchQuery(
-        tags: const [],
-        sources: sources,
-        ratingFilter: local.isSafeMode() ? ContentRating.safe : null,
-        limit: 30,
-      ));
+      late final Map<BooruSource, SourceResult> result;
+      if (_feedMode == _FeedMode.savedTags) {
+        final tags = local.getFavoriteTags().take(4).toList();
+        if (tags.isEmpty) {
+          result = {
+            for (final source in sources) source: const SourceResult([]),
+          };
+        } else {
+          final taggedResults = await Future.wait(tags.map((tag) =>
+              search.searchPerSourceDetailed(SearchQuery(
+                tags: [tag],
+                sources: sources,
+                ratingFilter: local.isSafeMode() ? ContentRating.safe : null,
+                limit: 6,
+              ))));
+          final postsBySource = {for (final source in sources) source: <Post>[]};
+          final failedBySource = <BooruSource>{};
+          final errorsBySource = <BooruSource, String>{};
+          for (final tagResult in taggedResults) {
+            for (final entry in tagResult.entries) {
+              postsBySource[entry.key]!.addAll(entry.value.posts);
+              if (entry.value.failed) failedBySource.add(entry.key);
+              if (entry.value.errorMessage != null) {
+                errorsBySource[entry.key] = entry.value.errorMessage!;
+              }
+            }
+          }
+          result = {
+            for (final source in sources)
+              source: SourceResult(
+                postsBySource[source]!,
+                failed: failedBySource.contains(source),
+                errorMessage: errorsBySource[source],
+              ),
+          };
+        }
+      } else {
+        result = await search.searchPerSourceDetailed(SearchQuery(
+          tags: const [],
+          sources: sources,
+          ratingFilter: local.isSafeMode() ? ContentRating.safe : null,
+          limit: 30,
+        ));
+      }
       final posts = result.values
           .expand((sourceResult) => sourceResult.posts)
           .where((post) => !local.isBlacklisted(post))
@@ -120,7 +169,7 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   void _sortPosts(List<Post> posts) {
-    if (_order == _FeedOrder.popular) {
+    if (_feedMode == _FeedMode.fresh && _order == _FeedOrder.popular) {
       posts.sort((a, b) => b.score.compareTo(a.score));
     } else {
       posts.sort((a, b) => (b.createdAt ?? DateTime(1970))
@@ -323,6 +372,45 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
             ),
             SliverToBoxAdapter(
+              child: ValueListenableBuilder<int>(
+                valueListenable:
+                    context.read<LocalRepository>().favoriteTagsRevision,
+                builder: (context, _, __) {
+                  final tags = context.read<LocalRepository>().getFavoriteTags();
+                  if (tags.isEmpty) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Saved tags', style: theme.textTheme.labelLarge),
+                        const SizedBox(height: 7),
+                        SizedBox(
+                          height: 34,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: tags.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 7),
+                            itemBuilder: (context, index) {
+                              final tag = tags[index];
+                              return ActionChip(
+                                visualDensity: VisualDensity.compact,
+                                label: Text(tag.replaceAll('_', ' ')),
+                                onPressed: () => context.go(
+                                  '/search?q=${Uri.encodeQueryComponent(tag)}',
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                 child: _SearchEntry(onTap: () {
@@ -339,14 +427,40 @@ class _FeedScreenState extends State<FeedScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Fresh finds', style: theme.textTheme.headlineMedium),
+                        Text(
+                          _feedMode == _FeedMode.savedTags
+                              ? 'Saved tag mix'
+                              : 'Fresh finds',
+                          style: theme.textTheme.headlineMedium,
+                        ),
                         const SizedBox(height: 3),
-                        Text('Across your favorite booru sites',
+                        Text(
+                            _feedMode == _FeedMode.savedTags
+                                ? 'Recent posts from your saved tags'
+                                : 'Across your favorite booru sites',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             )),
                       ],
                     ),
+                  ),
+                  SegmentedButton<_FeedLayout>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(
+                        value: _FeedLayout.grid,
+                        icon: Icon(Icons.grid_view_rounded, size: 17),
+                        tooltip: 'Grid feed',
+                      ),
+                      ButtonSegment(
+                        value: _FeedLayout.single,
+                        icon: Icon(Icons.view_agenda_outlined, size: 17),
+                        tooltip: 'Single post feed',
+                      ),
+                    ],
+                    selected: {_layout},
+                    onSelectionChanged: (selection) =>
+                        _setLayout(selection.first),
                   ),
                   IconButton(
                     tooltip: 'Refresh feed',
@@ -364,6 +478,20 @@ class _FeedScreenState extends State<FeedScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   scrollDirection: Axis.horizontal,
                   children: [
+                    _OrderPill(
+                      label: 'Fresh',
+                      selected: _feedMode == _FeedMode.fresh,
+                      icon: Icons.auto_awesome_rounded,
+                      onTap: () => _setFeedMode(_FeedMode.fresh),
+                    ),
+                    const SizedBox(width: 8),
+                    _OrderPill(
+                      label: 'Tag mix',
+                      selected: _feedMode == _FeedMode.savedTags,
+                      icon: Icons.bookmarks_outlined,
+                      onTap: () => _setFeedMode(_FeedMode.savedTags),
+                    ),
+                    const SizedBox(width: 8),
                     _OrderPill(
                       label: 'Popular',
                       selected: _order == _FeedOrder.popular,
@@ -466,19 +594,28 @@ class _FeedScreenState extends State<FeedScreen> {
                   icon: Icons.image_search_rounded,
                   title: 'No posts yet',
                   message: _sourceFilter == null
-                      ? 'Choose a source in Settings, then come back to your feed.'
+                      ? (_feedMode == _FeedMode.savedTags
+                          ? 'Save tags from Search to build a feed of recent posts for them.'
+                          : 'Choose a source in Settings, then come back to your feed.')
                       : 'No posts from this source right now. Try another source.',
                   action: TextButton(
-                    onPressed: () => context.go('/settings'),
-                    child: const Text('Manage sources'),
+                    onPressed: () => context.go(
+                      _feedMode == _FeedMode.savedTags ? '/search' : '/settings',
+                    ),
+                    child: Text(
+                      _feedMode == _FeedMode.savedTags
+                          ? 'Find tags'
+                          : 'Manage sources',
+                    ),
                   ),
                 ),
               )
             else ...[
               PostGridSliver(
-                key: ValueKey('${_order.name}-${_sourceFilter?.name}'),
+                key: ValueKey(
+                    '${_feedMode.name}-${_layout.name}-${_order.name}-${_sourceFilter?.name}'),
                 posts: visible,
-                columns: 2,
+                columns: _layout == _FeedLayout.grid ? 2 : 1,
                 onFavoriteTapped: _toggleFavorite,
                 onPostTapped: (post, index) {
                   context.push('/viewer', extra: {
@@ -500,6 +637,26 @@ class _FeedScreenState extends State<FeedScreen> {
       _order = order;
       _sortPosts(_posts);
     });
+    HapticFeedback.selectionClick();
+  }
+
+  void _setFeedMode(_FeedMode mode) {
+    if (_feedMode == mode) return;
+    setState(() {
+      _feedMode = mode;
+      if (mode == _FeedMode.savedTags) _order = _FeedOrder.latest;
+    });
+    HapticFeedback.selectionClick();
+    _loadFeed();
+  }
+
+  void _setLayout(_FeedLayout layout) {
+    if (_layout == layout) return;
+    setState(() => _layout = layout);
+    context.read<LocalRepository>().setSetting<String>(
+          'feed_layout',
+          layout.name,
+        );
     HapticFeedback.selectionClick();
   }
 }

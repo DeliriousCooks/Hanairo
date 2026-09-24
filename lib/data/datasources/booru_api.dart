@@ -181,12 +181,38 @@ class Rule34xxxDataSource implements BooruDataSource {
 
   @override
   Future<bool> login(String username, String credential) async {
-    // rule34.xxx authenticates with (user_id, api_key), not (username, password).
-    // The "username" parameter here is expected to be the numeric User ID shown
-    // on the account's API Access Credentials page.
-    _userId = username;
-    _apiKey = credential;
-    return true;
+    // Rule34 authenticates API access with (user_id, api_key). Validate the
+    // values against the API before saving them; previously this method
+    // reported success for any two non-empty strings.
+    final userId = username.trim();
+    final apiKey = credential.trim();
+    if (!RegExp(r'^\d+$').hasMatch(userId) || apiKey.isEmpty) return false;
+
+    try {
+      final response = await _dio.get(
+        '/index.php',
+        queryParameters: {
+          'page': 'dapi',
+          's': 'post',
+          'q': 'index',
+          'tags': 'rating:safe',
+          'limit': 1,
+          'pid': 0,
+          'json': 1,
+          'user_id': userId,
+          'api_key': apiKey,
+        },
+      );
+      _extractPostRows(response.data);
+      _userId = userId;
+      _apiKey = apiKey;
+      return true;
+    } catch (e) {
+      AppLogger.error('Rule34xxx credential validation failed', e);
+      _userId = null;
+      _apiKey = null;
+      return false;
+    }
   }
 
   @override

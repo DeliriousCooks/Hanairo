@@ -17,6 +17,7 @@ class LocalRepository {
   late Box<dynamic> _settings;
   final _secureStorage = const FlutterSecureStorage();
   final ValueNotifier<int> favoritesRevision = ValueNotifier<int>(0);
+  final ValueNotifier<int> favoriteTagsRevision = ValueNotifier<int>(0);
 
   Future<void> init() async {
     await Hive.initFlutter();
@@ -88,6 +89,38 @@ class LocalRepository {
       await _history.delete(k);
     }
   }
+
+  // ─── Favorite Tags ──────────────────────────────────────────────────────────
+
+  List<String> getFavoriteTags() {
+    final raw = getSetting<String>('favorite_tags', '');
+    if (raw.isEmpty) return const [];
+    try {
+      return (jsonDecode(raw) as List).cast<String>();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  bool isFavoriteTag(String tag) =>
+      getFavoriteTags().contains(_normalizeFavoriteTag(tag));
+
+  Future<void> toggleFavoriteTag(String tag) async {
+    final normalized = _normalizeFavoriteTag(tag);
+    if (normalized.isEmpty) return;
+    final tags = getFavoriteTags();
+    if (tags.contains(normalized)) {
+      tags.remove(normalized);
+    } else {
+      tags.insert(0, normalized);
+      if (tags.length > 30) tags.removeLast();
+    }
+    await setSetting<String>('favorite_tags', jsonEncode(tags));
+    favoriteTagsRevision.value++;
+  }
+
+  String _normalizeFavoriteTag(String tag) =>
+      tag.trim().replaceAll(RegExp(r'\s+'), '_');
 
   // ─── Blacklist ───────────────────────────────────────────────────────────────
 

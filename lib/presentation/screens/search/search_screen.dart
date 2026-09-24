@@ -9,6 +9,7 @@ import '../../blocs/search_bloc.dart';
 import '../../widgets/grid/post_grid.dart';
 import '../../widgets/search/filter_sheet.dart';
 import '../../widgets/common/page_background.dart';
+import '../../widgets/common/liquid_glass_surface.dart';
 import '../../../data/repositories/local_repository.dart';
 import '../../../core/tags/tag_translator.dart';
 
@@ -113,7 +114,9 @@ class _SearchScreenState extends State<SearchScreen>
     final query = allTags.join(' ');
 
     setState(() => _showSuggestions = false);
+    _inputFocus.unfocus();
     FocusScope.of(context).unfocus();
+    SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
     HapticFeedback.lightImpact();
     final bloc = context.read<SearchBloc>();
     bloc.add(SearchSubmitted(query, bloc.state.activeSources));
@@ -220,6 +223,11 @@ class _SearchScreenState extends State<SearchScreen>
                               .read<SearchBloc>()
                               .add(PostFavoriteToggled(post)),
                           onPostTapped: (post, index) {
+                          _inputFocus.unfocus();
+                          FocusScope.of(context).unfocus();
+                          SystemChannels.textInput.invokeMethod<void>(
+                            'TextInput.hide',
+                          );
                           context.push('/viewer', extra: {
                             'posts': state.posts,
                             'index': index,
@@ -313,7 +321,6 @@ class _FloatingSearchHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final topPad = MediaQuery.of(context).padding.top;
 
     return Positioned(
@@ -324,17 +331,10 @@ class _FloatingSearchHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Main search bar container
-          Container(
-            decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor.withOpacity(0.94),
-              border: showSuggestions
-                  ? null
-                  : Border(
-                      bottom: BorderSide(
-                        color: theme.colorScheme.outline.withOpacity(0.12),
-                        width: 0.5,
-                      ),
-                    ),
+          LiquidGlassSurface(
+            sigma: 20,
+            borderRadius: BorderRadius.vertical(
+              bottom: Radius.circular(showSuggestions ? 16 : 22),
             ),
             child: Padding(
               padding: EdgeInsets.fromLTRB(14, topPad + 10, 14, 10),
@@ -366,11 +366,14 @@ class _FloatingSearchHeader extends StatelessWidget {
           // Suggestions dropdown
           if (showSuggestions)
             BlocBuilder<SearchBloc, SearchState>(
-              buildWhen: (p, c) => p.tagSuggestions != c.tagSuggestions,
+              buildWhen: (p, c) =>
+                  p.tagSuggestions != c.tagSuggestions ||
+                  p.tagSuggestionCounts != c.tagSuggestionCounts,
               builder: (context, state) {
                 if (state.tagSuggestions.isEmpty) return const SizedBox();
                 return _SuggestionsDropdown(
                   suggestions: state.tagSuggestions,
+                  counts: state.tagSuggestionCounts,
                   onSelected: onSuggestionSelected,
                 );
               },
@@ -410,7 +413,9 @@ class _TagChipInput extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 44),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.7),
+          color: theme.colorScheme.surfaceContainerHighest.withOpacity(
+            theme.brightness == Brightness.dark ? 0.55 : 0.42,
+          ),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: theme.colorScheme.outline.withOpacity(0.2),
@@ -435,18 +440,22 @@ class _TagChipInput extends StatelessWidget {
                 onRemove: () => onTagRemoved(tag),
               ),
             // Text input
-              IntrinsicWidth(
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  minWidth: tagChips.isEmpty ? 220 : 150,
+                  maxWidth: 320,
+                ),
                 child: TextField(
                   controller: inputController,
                   focusNode: inputFocus,
                   textAlignVertical: TextAlignVertical.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
+                style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurface,
                 ),
                 decoration: InputDecoration(
                   isDense: true,
                   hintText: tagChips.isEmpty ? 'Search tags...' : 'Add tag...',
-                  hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                  hintStyle: theme.textTheme.bodyLarge?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
                   ),
                   border: InputBorder.none,
@@ -552,7 +561,9 @@ class _FilterButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: hasFilters
                   ? theme.colorScheme.primaryContainer
-                  : theme.colorScheme.surfaceContainerHighest.withOpacity(0.7),
+                  : theme.colorScheme.surfaceContainerHighest.withOpacity(
+                      theme.brightness == Brightness.dark ? 0.48 : 0.36,
+                    ),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: hasFilters
@@ -595,10 +606,12 @@ class _FilterButton extends StatelessWidget {
 
 class _SuggestionsDropdown extends StatelessWidget {
   final List<String> suggestions;
+  final Map<String, int> counts;
   final ValueChanged<String> onSelected;
 
   const _SuggestionsDropdown({
     required this.suggestions,
+    required this.counts,
     required this.onSelected,
   });
 
@@ -645,6 +658,29 @@ class _SuggestionsDropdown extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (counts.containsKey(tag)) ...[
+                    const SizedBox(width: 10),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: _formatTagCount(counts[tag]!),
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onSurface,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          TextSpan(
+                            text: ' posts',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 8),
                   Icon(
                     Icons.north_west_rounded,
                     size: 12,
@@ -801,26 +837,88 @@ class _ResultsHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              const Spacer(),
-              if (state.tagString.isNotEmpty)
-                Flexible(
-                  child: Text(
-                    '"${state.tagString}"',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.primary.withOpacity(0.8),
+              if (state.tagString.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: state.tagString,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.primary.withOpacity(0.9),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (state.tagCounts.isNotEmpty)
+                            TextSpan(
+                              text: '  ${_formatTagCount(combinedTagCount)}',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                        ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                if (state.tagString.trim().split(RegExp(r'\s+')).length == 1)
+                  ValueListenableBuilder<int>(
+                    valueListenable: context
+                        .read<LocalRepository>()
+                        .favoriteTagsRevision,
+                    builder: (context, _, __) {
+                      final local = context.read<LocalRepository>();
+                      final saved = local.isFavoriteTag(state.tagString);
+                      return IconButton(
+                        visualDensity: VisualDensity.compact,
+                        tooltip: saved ? 'Remove saved tag' : 'Save this tag',
+                        onPressed: () => local.toggleFavoriteTag(state.tagString),
+                        icon: Icon(
+                          saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                          size: 18,
+                          color: saved
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                      );
+                    },
+                  ),
+              ],
             ],
           ),
           if (state.tagCounts.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 7),
-              child: Text(
-                'Across enabled sites  ·  ${_formatTagCount(combinedTagCount)} total  ·  $countSummary',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant.withOpacity(0.78),
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Across enabled sites  ·  ',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.78),
+                      ),
+                    ),
+                    TextSpan(
+                      text: '${_formatTagCount(combinedTagCount)} total',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    TextSpan(
+                      text: '  ·  $countSummary',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.78),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

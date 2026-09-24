@@ -73,6 +73,7 @@ class SearchState extends Equatable {
   final Map<BooruSource, String> sourceErrors;
   final String? errorMessage;
   final List<String> tagSuggestions;
+  final Map<String, int> tagSuggestionCounts;
   final Map<BooruSource, int> tagCounts;
 
   const SearchState({
@@ -89,6 +90,7 @@ class SearchState extends Equatable {
     this.sourceErrors = const {},
     this.errorMessage,
     this.tagSuggestions = const [],
+    this.tagSuggestionCounts = const {},
     this.tagCounts = const {},
   });
 
@@ -118,6 +120,8 @@ class SearchState extends Equatable {
     String? errorMessage,
     bool clearError = false,
     List<String>? tagSuggestions,
+    Map<String, int>? tagSuggestionCounts,
+    bool clearTagSuggestionCounts = false,
     Map<BooruSource, int>? tagCounts,
     bool clearTagCounts = false,
   }) {
@@ -135,6 +139,9 @@ class SearchState extends Equatable {
       sourceErrors: sourceErrors ?? this.sourceErrors,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       tagSuggestions: tagSuggestions ?? this.tagSuggestions,
+      tagSuggestionCounts: clearTagSuggestionCounts
+          ? const {}
+          : (tagSuggestionCounts ?? this.tagSuggestionCounts),
       tagCounts: clearTagCounts ? const {} : (tagCounts ?? this.tagCounts),
     );
   }
@@ -169,6 +176,7 @@ class SearchState extends Equatable {
         sourceErrors,
         errorMessage,
         tagSuggestions,
+        tagSuggestionCounts,
         tagCounts,
       ];
 }
@@ -226,6 +234,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       sourceErrors: const {},
       clearError: true,
       tagSuggestions: [],
+      clearTagSuggestionCounts: true,
       clearTagCounts: true,
     ));
 
@@ -356,16 +365,27 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     Emitter<SearchState> emit,
   ) async {
     final query = event.query;
-    emit(state.copyWith(tagString: query, clearTagCounts: true));
+    emit(state.copyWith(
+      tagString: query,
+      tagSuggestions: const [],
+      clearTagCounts: true,
+      clearTagSuggestionCounts: true,
+    ));
 
     if (query.isEmpty || query.endsWith(' ')) {
-      emit(state.copyWith(tagSuggestions: []));
+      emit(state.copyWith(
+        tagSuggestions: [],
+        clearTagSuggestionCounts: true,
+      ));
       return;
     }
 
     final lastTag = query.trim().split(' ').last;
     if (lastTag.length < 2) {
-      emit(state.copyWith(tagSuggestions: []));
+      emit(state.copyWith(
+        tagSuggestions: [],
+        clearTagSuggestionCounts: true,
+      ));
       return;
     }
 
@@ -374,9 +394,44 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
         lastTag,
         state.activeSources,
       );
-      emit(state.copyWith(tagSuggestions: suggestions));
+      if (emit.isDone || state.tagString != query) return;
+      emit(state.copyWith(
+        tagSuggestions: suggestions.take(5).toList(),
+        clearTagSuggestionCounts: true,
+      ));
+
+      // Counts come from each enabled booru so the suggestions stay useful
+      // when users search across more than one source. Keep this to the first
+      // five suggestions to avoid firing an unbounded number of API calls.
+      final countResults = await Future.wait(
+        suggestions.take(5).map((tag) async {
+          try {
+            final perSource = await _searchRepo.getTagCounts(
+              tag,
+              state.activeSources,
+            );
+            final total =
+                perSource.values.fold<int>(0, (sum, count) => sum + count);
+            return total > 0 ? MapEntry(tag, total) : null;
+          } catch (_) {
+            return null;
+          }
+        }),
+      );
+      if (!emit.isDone && state.tagString == query) {
+        emit(state.copyWith(
+          tagSuggestionCounts: Map.fromEntries(
+            countResults.whereType<MapEntry<String, int>>(),
+          ),
+        ));
+      }
     } catch (e) {
-      emit(state.copyWith(tagSuggestions: []));
+      if (!emit.isDone && state.tagString == query) {
+        emit(state.copyWith(
+          tagSuggestions: [],
+          clearTagSuggestionCounts: true,
+        ));
+      }
     }
   }
 

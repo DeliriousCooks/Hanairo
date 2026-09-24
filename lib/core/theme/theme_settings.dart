@@ -78,6 +78,12 @@ enum ThemePreset {
     gradientDark: [Color(0xFF0A1A0F), Color(0xFF122B18)],
     gradientLight: [Color(0xFFEDF7EF), Color(0xFFD8EEDC)],
   ),
+  petal(
+    label: 'Petal',
+    suggestedAccent: AccentColor.pink,
+    gradientDark: [Color(0xFF21131F), Color(0xFF352238)],
+    gradientLight: [Color(0xFFFFF2F7), Color(0xFFECE5FA)],
+  ),
   noir(
     label: 'Noir',
     suggestedAccent: AccentColor.teal,

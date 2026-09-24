@@ -7,7 +7,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
 import 'package:ffmpeg_kit_flutter_new_full/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_new_full/return_code.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
@@ -588,14 +587,16 @@ Future<void> _savePostMedia(BuildContext context, Post post) async {
       '-y -i "$inputPath" -c:v $encoder -c:a aac -movflags +faststart "$mp4Path"',
     );
     var returnCode = await session.getReturnCode();
-    if (!ReturnCode.isSuccess(returnCode)) {
+    if (returnCode?.isValueSuccess() != true) {
       session = await FFmpegKit.execute(
         '-y -i "$inputPath" -c:v mpeg4 -c:a aac -movflags +faststart "$mp4Path"',
       );
       returnCode = await session.getReturnCode();
     }
     final converted = File(mp4Path);
-    if (!ReturnCode.isSuccess(returnCode) || !await converted.exists() || await converted.length() == 0) {
+    if (returnCode?.isValueSuccess() != true ||
+        !await converted.exists() ||
+        await converted.length() == 0) {
       throw StateError('Could not convert this WebM video to MP4');
     }
     pathToSave = mp4Path;

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_theme.dart';
+import '../common/liquid_glass_surface.dart';
 
 class SearchBarWidget extends StatelessWidget {
   final TextEditingController controller;
@@ -16,38 +16,44 @@ class SearchBarWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return TextField(
-      controller: controller,
-      onChanged: onChanged,
-      onSubmitted: onSubmitted,
-      autocorrect: false,
-      textInputAction: TextInputAction.search,
-      textAlignVertical: TextAlignVertical.center,
-      style: theme.textTheme.bodyLarge?.copyWith(
-        color: theme.colorScheme.onSurface,
-      ),
-      decoration: InputDecoration(
-        hintText: 'Tags: solo animated score:>50...',
-        prefixIcon: Icon(
-          Icons.search_rounded,
-          size: 20,
-          color: theme.colorScheme.onSurfaceVariant,
+    return LiquidGlassSurface(
+      sigma: 18,
+      borderRadius: BorderRadius.circular(16),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        onSubmitted: onSubmitted,
+        autocorrect: false,
+        textInputAction: TextInputAction.search,
+        textAlignVertical: TextAlignVertical.center,
+        style: theme.textTheme.bodyLarge?.copyWith(
+          color: theme.colorScheme.onSurface,
         ),
-        suffixIcon: controller.text.isNotEmpty
-            ? IconButton(
-                icon: Icon(
-                  Icons.clear_rounded,
-                  size: 18,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                onPressed: () {
-                  controller.clear();
-                  onChanged('');
-                },
-              )
-            : null,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: InputDecoration(
+          filled: false,
+          hintText: 'Tags: solo animated score:>50...',
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            size: 20,
+            color: theme.colorScheme.primary,
+          ),
+          suffixIcon: controller.text.isNotEmpty
+              ? IconButton(
+                  icon: Icon(
+                    Icons.clear_rounded,
+                    size: 18,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  onPressed: () {
+                    controller.clear();
+                    onChanged('');
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
       ),
     );
   }

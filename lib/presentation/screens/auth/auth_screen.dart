@@ -34,9 +34,20 @@ class _AuthScreenState extends State<AuthScreen> {
     final creds = await repo.loadCredentials();
     final sourceCreds = creds[widget.source.name];
     if (sourceCreds != null) {
+      final username = sourceCreds['username'] ?? '';
+      final credential = sourceCreds['credential'] ?? '';
+      final connected = widget.source == BooruSource.rule34xxx
+          ? await context
+              .read<SearchRepository>()
+              .login(widget.source, username, credential)
+          : true;
+      if (!mounted) return;
       setState(() {
-        _usernameCtrl.text = sourceCreds['username'] ?? '';
-        _loggedIn = true;
+        _usernameCtrl.text = username;
+        _loggedIn = connected;
+        if (!connected) {
+          _error = 'Saved Rule34 credentials could not be verified. Check your User ID and API key.';
+        }
       });
     }
   }

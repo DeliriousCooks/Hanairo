@@ -8,6 +8,7 @@ import '../../../data/repositories/local_repository.dart';
 import '../../../domain/entities/post.dart';
 import '../../blocs/search_bloc.dart';
 import '../../widgets/common/page_background.dart';
+import '../../widgets/common/liquid_glass_surface.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -243,39 +244,35 @@ class _QuickSearchBar extends StatelessWidget {
         HapticFeedback.lightImpact();
         context.go('/search');
       },
-      child: Container(
-        height: 52,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.7),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: theme.colorScheme.outline.withOpacity(0.15),
-            width: 0.5,
+      child: LiquidGlassSurface(
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          height: 52,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.search_rounded,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Search tags, artists, characters...',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.78),
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.tune_rounded,
+                  size: 18,
+                  color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                ),
+              ],
+            ),
           ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            Icon(
-              Icons.search_rounded,
-              size: 20,
-              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Search tags, artists, characters...',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
-              ),
-            ),
-            const Spacer(),
-            // Mic icon hint
-            Icon(
-              Icons.mic_none_rounded,
-              size: 18,
-              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
-            ),
-          ],
         ),
       ),
     );
