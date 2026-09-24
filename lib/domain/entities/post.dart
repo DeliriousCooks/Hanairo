@@ -175,7 +175,7 @@ class SearchQuery extends Equatable {
     this.minScore,
     this.fileTypeFilter,
     this.page = 0,
-    this.limit = 40,
+    this.limit = 60,
   });
 
   String get tagString => tags.join(' ');

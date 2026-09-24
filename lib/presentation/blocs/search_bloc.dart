@@ -147,7 +147,7 @@ class SearchState extends Equatable {
         minScore: minScore,
         fileTypeFilter: fileTypeFilter,
         page: 0,
-        limit: 40,
+        limit: 60,
       );
 
   @override

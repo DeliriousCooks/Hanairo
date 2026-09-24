@@ -83,7 +83,10 @@ class TagTranslator {
       case BooruSource.rule34xxx:
       case BooruSource.gelbooru:
       case BooruSource.xbooru:
-        return '+';
+        // Dio encodes query parameter values itself. Passing a literal plus
+        // here becomes `%2B` and these APIs treat it as part of the tag.
+        // Spaces are correctly encoded and decoded as tag separators.
+        return ' ';
       case BooruSource.e621:
       case BooruSource.paheal:
       case BooruSource.danbooru:

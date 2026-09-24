@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,6 +6,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
+import 'package:ffmpeg_kit_flutter_new_full/ffmpeg_kit.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -308,6 +312,7 @@ class _VideoPlayerWidget extends StatefulWidget {
 class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
   VideoPlayerController? _vpController;
   bool _initialized = false;
+  bool _muted = true;
   String? _error;
 
   @override
@@ -327,6 +332,7 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
       _vpController = VideoPlayerController.networkUrl(Uri.parse(url));
       await _vpController!.initialize();
       await _vpController!.setLooping(true);
+      await _vpController!.setVolume(0);
       await _vpController!.play();
 
       if (mounted) setState(() => _initialized = true);
@@ -392,6 +398,27 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
                     playedColor: Color(0xFF9D83FF),
                     bufferedColor: Colors.white38,
                     backgroundColor: Colors.white24,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 12,
+              right: 12,
+              child: Material(
+                color: Colors.black.withOpacity(0.64),
+                shape: const CircleBorder(),
+                child: IconButton(
+                  tooltip: _muted ? 'Unmute video' : 'Mute video',
+                  onPressed: () async {
+                    final nextMuted = !_muted;
+                    await _vpController!.setVolume(nextMuted ? 0 : 1);
+                    if (mounted) setState(() => _muted = nextMuted);
+                  },
+                  icon: Icon(
+                    _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                    color: Colors.white,
+                    size: 21,
                   ),
                 ),
               ),
@@ -530,6 +557,50 @@ String _sourcePostUrl(Post post) {
       return 'https://danbooru.donmai.us/posts/$id';
     case BooruSource.xbooru:
       return 'https://xbooru.com/index.php?page=post&s=view&id=$id';
+  }
+}
+
+Future<void> _savePostMedia(BuildContext context, Post post) async {
+  final url = post.fileUrl ?? post.sampleUrl ?? post.previewUrl;
+  if (url == null || url.isEmpty) throw StateError('No media URL is available');
+
+  final uri = Uri.parse(url);
+  final pathName = uri.pathSegments.isEmpty ? '' : uri.pathSegments.last;
+  final extension = pathName.contains('.')
+      ? pathName.split('.').last.toLowerCase()
+      : (post.isVideo ? 'mp4' : 'jpg');
+  final temp = await getTemporaryDirectory();
+  final inputPath = '${temp.path}/booruwave-${post.id}.$extension';
+  await Dio().download(
+    url,
+    inputPath,
+    options: Options(receiveTimeout: const Duration(minutes: 3)),
+  );
+
+  var pathToSave = inputPath;
+  if (post.isVideo && extension == 'webm') {
+    final mp4Path = '${temp.path}/booruwave-${post.id}.mp4';
+    final encoder = Platform.isIOS ? 'h264_videotoolbox' : 'h264_mediacodec';
+    var session = await FFmpegKit.execute(
+      '-y -i "$inputPath" -c:v $encoder -c:a aac -movflags +faststart "$mp4Path"',
+    );
+    var returnCode = await session.getReturnCode();
+    if (!ReturnCode.isSuccess(returnCode)) {
+      session = await FFmpegKit.execute(
+        '-y -i "$inputPath" -c:v mpeg4 -c:a aac -movflags +faststart "$mp4Path"',
+      );
+      returnCode = await session.getReturnCode();
+    }
+    final converted = File(mp4Path);
+    if (!ReturnCode.isSuccess(returnCode) || !await converted.exists() || await converted.length() == 0) {
+      throw StateError('Could not convert this WebM video to MP4');
+    }
+    pathToSave = mp4Path;
+  }
+
+  final result = await ImageGallerySaver.saveFile(pathToSave);
+  if (result is Map && result['isSuccess'] != true && result['success'] != true) {
+    throw StateError('The photo library did not accept this file');
   }
 }
 
@@ -708,6 +779,7 @@ class _BottomActions extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _SaveAction(post: post),
+              _DownloadAction(post: post),
               _ActionButton(
                 icon: Icons.open_in_browser_rounded,
                 label: 'Source',
@@ -729,6 +801,50 @@ class _BottomActions extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DownloadAction extends StatefulWidget {
+  final Post post;
+  const _DownloadAction({required this.post});
+
+  @override
+  State<_DownloadAction> createState() => _DownloadActionState();
+}
+
+class _DownloadActionState extends State<_DownloadAction> {
+  bool _saving = false;
+
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      await _savePostMedia(context, widget.post);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text(widget.post.isVideo ? 'Video saved to Photos' : 'Image saved to Photos'),
+          duration: const Duration(seconds: 2),
+        ));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text('Could not save this media: $error'),
+          duration: const Duration(seconds: 3),
+        ));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => _ActionButton(
+        icon: _saving ? Icons.downloading_rounded : Icons.download_rounded,
+        label: _saving ? 'Saving' : 'Photos',
+        onTap: _save,
+      );
 }
 
 class _SaveAction extends StatelessWidget {

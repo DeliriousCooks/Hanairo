@@ -421,10 +421,11 @@ class _TagChipInput extends StatelessWidget {
                 onRemove: () => onTagRemoved(tag),
               ),
             // Text input
-            IntrinsicWidth(
-              child: TextField(
-                controller: inputController,
-                focusNode: inputFocus,
+              IntrinsicWidth(
+                child: TextField(
+                  controller: inputController,
+                  focusNode: inputFocus,
+                  textAlignVertical: TextAlignVertical.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurface,
                 ),
@@ -435,7 +436,7 @@ class _TagChipInput extends StatelessWidget {
                     color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
                   ),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
                 ),
                 textInputAction: TextInputAction.search,
                 onSubmitted: (v) {

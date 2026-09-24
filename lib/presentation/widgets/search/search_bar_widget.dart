@@ -22,6 +22,7 @@ class SearchBarWidget extends StatelessWidget {
       onSubmitted: onSubmitted,
       autocorrect: false,
       textInputAction: TextInputAction.search,
+      textAlignVertical: TextAlignVertical.center,
       style: theme.textTheme.bodyLarge?.copyWith(
         color: theme.colorScheme.onSurface,
       ),

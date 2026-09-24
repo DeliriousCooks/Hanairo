@@ -86,7 +86,7 @@ enum ThemePreset {
   ),
   oled(
     label: 'OLED Black',
-    suggestedAccent: AccentColor.violet,
+    suggestedAccent: AccentColor.teal,
     gradientDark: [Color(0xFF000000), Color(0xFF000000)],
     gradientLight: [Color(0xFFF5F5FA), Color(0xFFECEAF7)],
   );

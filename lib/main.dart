@@ -274,13 +274,15 @@ class _BottomNav extends StatelessWidget {
           children: [
             for (var i = 0; i < _items.length; i++)
               Expanded(
-                child: _NavItem(
+                child: Center(
+                  child: _NavItem(
                   icon: _items[i].icon,
                   selectedIcon: _items[i].selectedIcon,
                   label: _items[i].label,
                   selected: i == selectedIndex,
                   color: theme.colorScheme.primary,
                   onTap: () => onDestinationSelected(i),
+                  ),
                 ),
               ),
           ],
@@ -320,7 +322,7 @@ class _NavItem extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? color : Colors.transparent,
           borderRadius: BorderRadius.circular(24),
-          boxShadow: selected ? [BoxShadow(color: color.withOpacity(0.38), blurRadius: 16, spreadRadius: -5)] : null,
+          boxShadow: selected ? [BoxShadow(color: color.withOpacity(0.28), blurRadius: 9, spreadRadius: -5)] : null,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

@@ -58,15 +58,10 @@ class Rule34xxxDataSource implements BooruDataSource {
 
       final response = await _dio.get('/index.php', queryParameters: params);
 
-      if (response.data == null) return [];
-
-      final List<dynamic> data =
-          response.data is List ? response.data : [response.data];
-
-      return data.map((json) => _parsePost(json as Map<String, dynamic>)).toList();
+      return _extractPostRows(response.data).map(_parsePost).toList();
     } catch (e) {
       AppLogger.error('Rule34xxx search error', e);
-      return [];
+      rethrow;
     }
   }
 
@@ -447,14 +442,10 @@ class GelbooruDataSource implements BooruDataSource {
       }
 
       final response = await _dio.get('/index.php', queryParameters: params);
-      final data = response.data as Map<String, dynamic>?;
-      if (data == null) return [];
-
-      final posts = data['post'] as List<dynamic>? ?? [];
-      return posts.map((p) => _parsePost(p as Map<String, dynamic>)).toList();
+      return _extractPostRows(response.data).map(_parsePost).toList();
     } catch (e) {
       AppLogger.error('Gelbooru search error', e);
-      return [];
+      rethrow;
     }
   }
 
@@ -604,11 +595,11 @@ class PahealDataSource implements BooruDataSource {
       if (xmlStr.isEmpty) return [];
 
       final doc = XmlDocument.parse(xmlStr);
-      final posts = doc.findAllElements('tag');
+      final posts = doc.findAllElements('post');
       return posts.map(_parseXmlPost).toList();
     } catch (e) {
       AppLogger.error('Paheal search error', e);
-      return [];
+      rethrow;
     }
   }
 
@@ -682,6 +673,47 @@ class PahealDataSource implements BooruDataSource {
 }
 
 // ─── SHARED HELPERS ───────────────────────────────────────────────────────────
+
+List<Map<String, dynamic>> _extractPostRows(dynamic body) {
+  if (body is List) {
+    return body
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
+  }
+  if (body is Map) {
+    final rows = body['post'] ?? body['posts'];
+    if (rows is List) {
+      return rows
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
+    }
+    if (rows is Map) return [Map<String, dynamic>.from(rows)];
+    if (body.containsKey('id') && body.containsKey('file_url')) {
+      return [Map<String, dynamic>.from(body)];
+    }
+    return const [];
+  }
+  if (body is String) {
+    final trimmed = body.trimLeft();
+    try {
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        return _extractPostRows(jsonDecode(body));
+      }
+      if (trimmed.startsWith('<')) {
+        final document = XmlDocument.parse(body);
+        return document.findAllElements('post').map((element) => <String, dynamic>{
+              for (final attribute in element.attributes)
+                attribute.name.local: attribute.value,
+            }).toList();
+      }
+    } catch (_) {
+      return const [];
+    }
+  }
+  return const [];
+}
 
 int? _toInt(dynamic value) {
   if (value == null) return null;
