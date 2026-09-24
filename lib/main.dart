@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoPage;
 import 'package:flutter/services.dart';
+import 'dart:ui' show ImageFilter;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/theme/theme_settings.dart';
-import 'presentation/widgets/common/glass_container.dart';
 import 'data/repositories/search_repository.dart';
 import 'data/repositories/local_repository.dart';
 import 'presentation/blocs/search_bloc.dart';
@@ -61,35 +61,40 @@ final _router = GoRouter(
       routes: [
         GoRoute(
           path: '/',
-          pageBuilder: (context, state) => const NoTransitionPage(
-            child: FeedScreen(),
+          pageBuilder: (context, state) => _tabTransitionPage(
+            key: state.pageKey,
+            child: const FeedScreen(),
           ),
         ),
         GoRoute(
           path: '/search',
           pageBuilder: (context, state) {
             final query = state.uri.queryParameters['q'] ?? '';
-            return NoTransitionPage(
+            return _tabTransitionPage(
+              key: state.pageKey,
               child: SearchScreen(initialQuery: query),
             );
           },
         ),
         GoRoute(
           path: '/favorites',
-          pageBuilder: (context, state) => const NoTransitionPage(
-            child: FavoritesScreen(),
+          pageBuilder: (context, state) => _tabTransitionPage(
+            key: state.pageKey,
+            child: const FavoritesScreen(),
           ),
         ),
         GoRoute(
           path: '/account',
-          pageBuilder: (context, state) => const NoTransitionPage(
-            child: AccountScreen(),
+          pageBuilder: (context, state) => _tabTransitionPage(
+            key: state.pageKey,
+            child: const AccountScreen(),
           ),
         ),
         GoRoute(
           path: '/settings',
-          pageBuilder: (context, state) => const NoTransitionPage(
-            child: SettingsScreen(),
+          pageBuilder: (context, state) => _tabTransitionPage(
+            key: state.pageKey,
+            child: const SettingsScreen(),
           ),
         ),
       ],
@@ -124,6 +129,35 @@ final _router = GoRouter(
     ),
   ],
 );
+
+CustomTransitionPage<void> _tabTransitionPage({
+  required LocalKey key,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: key,
+    transitionDuration: const Duration(milliseconds: 210),
+    reverseTransitionDuration: const Duration(milliseconds: 170),
+    child: child,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curve = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return FadeTransition(
+        opacity: curve,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.018),
+            end: Offset.zero,
+          ).animate(curve),
+          child: child,
+        ),
+      );
+    },
+  );
+}
 
 class BooruApp extends StatelessWidget {
   const BooruApp({super.key});
@@ -268,19 +302,29 @@ class _BottomNav extends StatelessWidget {
       heightFactor: 1,
       child: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: SizedBox(
-          height: 76,
-          child: GlassContainer(
-            thickness: glass,
-            borderRadius: BorderRadius.circular(28),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-            child: Row(
-              mainAxisSize: MainAxisSize.max,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                for (var i = 0; i < _items.length; i++)
-                  Expanded(
-                    child: Center(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: glass.sigma, sigmaY: glass.sigma),
+            child: Container(
+              height: 76,
+              decoration: BoxDecoration(
+                // Keep the dock surface opaque enough that the page's colored
+                // background cannot bleed together under every tab item.
+                color: theme.colorScheme.surface.withOpacity(0.94),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: theme.colorScheme.outline.withOpacity(0.38),
+                  width: 1,
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+              child: Row(
+                mainAxisSize: MainAxisSize.max,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  for (var i = 0; i < _items.length; i++)
+                    Expanded(
                       child: _NavItem(
                         icon: _items[i].icon,
                         selectedIcon: _items[i].selectedIcon,
@@ -290,8 +334,8 @@ class _BottomNav extends StatelessWidget {
                         onTap: () => onDestinationSelected(i),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -323,38 +367,52 @@ class _NavItem extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutBack,
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 3),
-        decoration: BoxDecoration(
-          color: selected ? color : Colors.transparent,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: selected ? [BoxShadow(color: color.withOpacity(0.28), blurRadius: 9, spreadRadius: -5)] : null,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              selected ? selectedIcon : icon,
-              size: selected ? 24 : 21,
-              color: selected
-                  ? Colors.white
-                  : theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              maxLines: 1,
-              softWrap: false,
-              overflow: TextOverflow.clip,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: selected ? Colors.white : theme.colorScheme.onSurfaceVariant,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                fontSize: 9,
+      child: SizedBox.expand(
+        child: Center(
+          child: AnimatedScale(
+            duration: const Duration(milliseconds: 190),
+            curve: Curves.easeOutCubic,
+            scale: selected ? 1 : 0.96,
+            child: AnimatedContainer(
+              // Every selected tab gets the same compact footprint. This
+              // prevents the highlight from filling its whole flex slot.
+              width: 64,
+              height: 58,
+              alignment: Alignment.center,
+              duration: const Duration(milliseconds: 190),
+              curve: Curves.easeOutCubic,
+              decoration: BoxDecoration(
+                color: selected ? color : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    selected ? selectedIcon : icon,
+                    size: selected ? 22 : 20,
+                    color: selected
+                        ? Colors.white
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.clip,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: selected
+                          ? Colors.white
+                          : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                      fontSize: 9,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

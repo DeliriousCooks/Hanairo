@@ -1,11 +1,16 @@
-# BooruWave UI update v10
+# BooruWave UI update v11
 
-This source overlay fixes the bottom dock sizing regression. It contains updated `lib/`, the app assets, and a `pubspec.yaml` reference. Apply it over the version you already integrated, or merge its updated `lib/main.dart` into your current project.
+This is a source overlay for the existing Flutter app. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
 
-## Dock fix
+## Changes
 
-The floating tab dock now has a fixed 76-pixel height, stays aligned to the bottom safe area, and keeps each selected tab in its own compact capsule. Its glass blur is clipped to the dock instead of filling the screen.
+- Gave each tab a fixed, compact highlight capsule and made the dock surface opaque enough to keep the background colors from blending across the bar.
+- Added a short fade and lift animation when changing tabs.
+- Stopped empty Feed and Search screens from bouncing into a larger blank area.
+- Made source chips refresh an active query immediately.
+- Added adjacent-post preloading and clipped, non-bouncing paging in the full-screen viewer.
+- Updated Paheal post and tag requests to Shimmie's current API routes.
+- Kept API errors and authentication failures visible instead of showing them as zero results. Failed Rule34 and Gelbooru requests include a direct account connection action.
+- Fixed Gelbooru credentials to use User ID and API Key fields, and passed saved Rule34/Gelbooru credentials to search, tag-count, and suggestion requests.
 
-This overlay also carries the latest prior fixes: search field alignment, source search parsing, 60-post pages, video mute and save/MP4 conversion, and the FFmpeg ReturnCode import.
-
-If you only want the dock fix, replace `lib/main.dart` from this package in your project. No dependency changes are needed for this fix.
+Rule34 currently requires API credentials for API search requests. Gelbooru may require them at times. The auth screens explain where to retrieve each site's credentials.

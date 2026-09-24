@@ -7,7 +7,8 @@ import '../../core/tags/tag_translator.dart';
 class SourceResult {
   final List<Post> posts;
   final bool failed;
-  const SourceResult(this.posts, {this.failed = false});
+  final String? errorMessage;
+  const SourceResult(this.posts, {this.failed = false, this.errorMessage});
 }
 
 class SearchRepository {
@@ -46,7 +47,10 @@ class SearchRepository {
         return MapEntry(source, SourceResult(posts));
       } catch (e) {
         AppLogger.error('Source $source timed out or failed', e);
-        return MapEntry(source, const SourceResult([], failed: true));
+        return MapEntry(
+          source,
+          SourceResult([], failed: true, errorMessage: e.toString()),
+        );
       }
     }));
     return Map.fromEntries(entries);

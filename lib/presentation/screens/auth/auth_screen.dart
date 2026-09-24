@@ -139,7 +139,8 @@ class _AuthScreenState extends State<AuthScreen> {
               const SizedBox(height: 24),
 
               Text(
-                source == BooruSource.rule34xxx
+                source == BooruSource.rule34xxx ||
+                        source == BooruSource.gelbooru
                     ? 'User ID'
                     : 'Username',
                 style: theme.textTheme.labelLarge,
@@ -148,19 +149,21 @@ class _AuthScreenState extends State<AuthScreen> {
               TextField(
                 controller: _usernameCtrl,
                 decoration: InputDecoration(
-                  hintText: source == BooruSource.rule34xxx
+                  hintText: source == BooruSource.rule34xxx ||
+                          source == BooruSource.gelbooru
                       ? 'Your numeric user ID'
                       : 'Your username',
                   prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
                 ),
-                keyboardType: source == BooruSource.rule34xxx
+                keyboardType: source == BooruSource.rule34xxx ||
+                        source == BooruSource.gelbooru
                     ? TextInputType.number
                     : TextInputType.emailAddress,
                 autocorrect: false,
               ),
               const SizedBox(height: 16),
               Text(
-                source == BooruSource.gelbooru ? 'User ID' : 'API Key',
+                'API Key',
                 style: theme.textTheme.labelLarge,
               ),
               const SizedBox(height: 8),
@@ -168,9 +171,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 controller: _credCtrl,
                 obscureText: _obscure,
                 decoration: InputDecoration(
-                  hintText: source == BooruSource.gelbooru
-                      ? 'Your user ID number'
-                      : 'Your API key',
+                  hintText: 'Your API key',
                   prefixIcon:
                       const Icon(Icons.key_outlined, size: 20),
                   suffixIcon: IconButton(
@@ -285,7 +286,13 @@ class _SourceHeader extends StatelessWidget {
               Text(source.domain, style: theme.textTheme.headlineMedium),
               const SizedBox(height: 4),
               Text(
-                'Connect your account for higher limits & favorites',
+                source == BooruSource.rule34xxx
+                    ? 'API credentials are required to search Rule34.xxx.'
+                    : source == BooruSource.gelbooru
+                        ? 'Gelbooru may require API credentials for search access.'
+                        : source == BooruSource.paheal
+                            ? 'Paheal search works without an account.'
+                            : 'Connect for higher limits and account features.',
                 style: theme.textTheme.bodyMedium,
               ),
             ],

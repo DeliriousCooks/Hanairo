@@ -135,10 +135,15 @@ class Rule34xxxDataSource implements BooruDataSource {
   @override
   Future<int?> getTagCount(String tag) async {
     try {
-      final response = await _dio.get('/index.php', queryParameters: {
+      final params = <String, dynamic>{
         'page': 'dapi', 's': 'tag', 'q': 'index',
         'name_pattern': canonicalizeTag(tag), 'limit': 20, 'json': 1,
-      });
+      };
+      if (_userId != null && _apiKey != null) {
+        params['user_id'] = _userId;
+        params['api_key'] = _apiKey;
+      }
+      final response = await _dio.get('/index.php', queryParameters: params);
       final rows = response.data is List ? response.data as List : [response.data];
       for (final row in rows) {
         if (row is Map && row['name'] == canonicalizeTag(tag)) {
@@ -487,7 +492,7 @@ class GelbooruDataSource implements BooruDataSource {
   @override
   Future<List<String>> getTagSuggestions(String prefix) async {
     try {
-      final response = await _dio.get('/index.php', queryParameters: {
+      final params = <String, dynamic>{
         'page': 'dapi',
         's': 'tag',
         'q': 'index',
@@ -495,7 +500,12 @@ class GelbooruDataSource implements BooruDataSource {
         'limit': 20,
         'json': 1,
         'orderby': 'count',
-      });
+      };
+      if (_userId != null && _apiKey != null) {
+        params['user_id'] = _userId;
+        params['api_key'] = _apiKey;
+      }
+      final response = await _dio.get('/index.php', queryParameters: params);
       final data = response.data;
       if (data == null) return [];
       if (data is Map && data['tag'] != null) {
@@ -511,10 +521,15 @@ class GelbooruDataSource implements BooruDataSource {
   @override
   Future<int?> getTagCount(String tag) async {
     try {
-      final response = await _dio.get('/index.php', queryParameters: {
+      final params = <String, dynamic>{
         'page': 'dapi', 's': 'tag', 'q': 'index',
         'name_pattern': canonicalizeTag(tag), 'limit': 20, 'json': 1,
-      });
+      };
+      if (_userId != null && _apiKey != null) {
+        params['user_id'] = _userId;
+        params['api_key'] = _apiKey;
+      }
+      final response = await _dio.get('/index.php', queryParameters: params);
       final body = response.data;
       final rows = body is Map ? (body['tag'] as List<dynamic>? ?? []) : <dynamic>[];
       for (final row in rows) {
@@ -583,7 +598,7 @@ class PahealDataSource implements BooruDataSource {
       final tagString = TagTranslator.translateForSource(query.tags, BooruSource.paheal);
       final page = query.page + 1;
       final response = await _dio.get(
-        '/api/danbooru/find_posts/index.xml',
+        '/api/danbooru/post/index.xml',
         queryParameters: {
           'tags': tagString,
           'limit': query.limit,
@@ -595,6 +610,17 @@ class PahealDataSource implements BooruDataSource {
       if (xmlStr.isEmpty) return [];
 
       final doc = XmlDocument.parse(xmlStr);
+      final xmlError = _xmlErrorText(doc);
+      if (xmlError != null) throw BooruApiException(xmlError);
+      final root = doc.rootElement;
+      final rootError = _apiErrorText({
+        for (final attribute in root.attributes)
+          attribute.name.local: attribute.value,
+      });
+      if (rootError != null) throw BooruApiException(rootError);
+      if (root.name.local != 'posts' && root.name.local != 'post') {
+        throw const FormatException('Paheal returned an HTML or unknown response.');
+      }
       final posts = doc.findAllElements('post');
       return posts.map(_parseXmlPost).toList();
     } catch (e) {
@@ -631,7 +657,7 @@ class PahealDataSource implements BooruDataSource {
   Future<List<String>> getTagSuggestions(String prefix) async {
     try {
       final response = await _dio.get(
-        '/api/danbooru/find_tags/index.xml',
+        '/api/danbooru/find_tags',
         queryParameters: {'name': '${prefix}%', 'limit': 20},
       );
       final xmlStr = response.data as String? ?? '';
@@ -646,7 +672,7 @@ class PahealDataSource implements BooruDataSource {
   @override
   Future<int?> getTagCount(String tag) async {
     try {
-      final response = await _dio.get('/api/danbooru/find_tags/index.xml',
+      final response = await _dio.get('/api/danbooru/find_tags',
           queryParameters: {'name': canonicalizeTag(tag), 'limit': 20});
       final xmlStr = response.data as String? ?? '';
       if (xmlStr.isEmpty) return null;
@@ -676,20 +702,37 @@ class PahealDataSource implements BooruDataSource {
 
 List<Map<String, dynamic>> _extractPostRows(dynamic body) {
   if (body is List) {
-    return body
+    final rows = body
         .whereType<Map>()
         .map((row) => Map<String, dynamic>.from(row))
         .toList();
+    for (final row in rows) {
+      final apiError = _apiErrorText(row);
+      if (apiError != null) throw BooruApiException(apiError);
+    }
+    return rows;
   }
   if (body is Map) {
+    final apiError = _apiErrorText(body);
+    if (apiError != null) throw BooruApiException(apiError);
     final rows = body['post'] ?? body['posts'];
     if (rows is List) {
-      return rows
+      final posts = rows
           .whereType<Map>()
           .map((row) => Map<String, dynamic>.from(row))
           .toList();
+      for (final post in posts) {
+        final rowError = _apiErrorText(post);
+        if (rowError != null) throw BooruApiException(rowError);
+      }
+      return posts;
     }
-    if (rows is Map) return [Map<String, dynamic>.from(rows)];
+    if (rows is Map) {
+      final post = Map<String, dynamic>.from(rows);
+      final rowError = _apiErrorText(post);
+      if (rowError != null) throw BooruApiException(rowError);
+      return [post];
+    }
     if (body.containsKey('id') && body.containsKey('file_url')) {
       return [Map<String, dynamic>.from(body)];
     }
@@ -697,22 +740,75 @@ List<Map<String, dynamic>> _extractPostRows(dynamic body) {
   }
   if (body is String) {
     final trimmed = body.trimLeft();
+    if (trimmed.isEmpty) return const [];
     try {
       if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
         return _extractPostRows(jsonDecode(body));
       }
       if (trimmed.startsWith('<')) {
         final document = XmlDocument.parse(body);
+        final xmlError = _xmlErrorText(document);
+        if (xmlError != null) throw BooruApiException(xmlError);
+        final root = document.rootElement;
+        final rootError = _apiErrorText({
+          for (final attribute in root.attributes)
+            attribute.name.local: attribute.value,
+        });
+        if (rootError != null) throw BooruApiException(rootError);
+        if (root.name.local != 'posts' && root.name.local != 'post') {
+          throw const FormatException('The source returned an HTML or unknown response.');
+        }
         return document.findAllElements('post').map((element) => <String, dynamic>{
               for (final attribute in element.attributes)
                 attribute.name.local: attribute.value,
             }).toList();
       }
     } catch (_) {
-      return const [];
+      rethrow;
     }
+    throw const FormatException('The source returned an unknown response.');
   }
   return const [];
+}
+
+String? _apiErrorText(Map<dynamic, dynamic> body) {
+  final nestedAttributes = body['@attributes'] ?? body['attributes'];
+  if (nestedAttributes is Map) {
+    final nestedError = _apiErrorText(nestedAttributes);
+    if (nestedError != null) return nestedError;
+  }
+  final success = body['success']?.toString().toLowerCase();
+  final message = (body['message'] ?? body['reason'])?.toString().trim();
+  final error = body['error']?.toString().trim();
+  if (success == 'false' || success == '0') {
+    return (message?.isNotEmpty ?? false)
+        ? message
+        : ((error?.isNotEmpty ?? false) ? error : 'The source rejected the request.');
+  }
+  if (error != null && error.isNotEmpty && error.toLowerCase() != 'false') {
+    return error;
+  }
+  return null;
+}
+
+String? _xmlErrorText(XmlDocument document) {
+  for (final element in document.findAllElements('error')) {
+    final attributes = {
+      for (final attribute in element.attributes)
+        attribute.name.local: attribute.value,
+    };
+    final message = _apiErrorText(attributes) ?? element.innerText.trim();
+    if (message.isNotEmpty) return message;
+  }
+  return null;
+}
+
+class BooruApiException implements Exception {
+  final String message;
+  const BooruApiException(this.message);
+
+  @override
+  String toString() => message;
 }
 
 int? _toInt(dynamic value) {

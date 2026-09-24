@@ -217,7 +217,9 @@ class _MediaGallery extends StatelessWidget {
       controller: pageController,
       itemCount: posts.length,
       onPageChanged: onPageChanged,
-      physics: const BouncingScrollPhysics(),
+      allowImplicitScrolling: true,
+      clipBehavior: Clip.hardEdge,
+      physics: const PageScrollPhysics(parent: ClampingScrollPhysics()),
       itemBuilder: (context, index) {
         final post = posts[index];
         return post.isVideo

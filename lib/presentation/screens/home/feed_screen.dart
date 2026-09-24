@@ -15,6 +15,14 @@ import '../../../main.dart' show ThemeScope;
 
 enum _FeedOrder { popular, latest }
 
+bool _sourceRequiresCredentials(BooruSource source, String? error) {
+  if (source != BooruSource.rule34xxx && source != BooruSource.gelbooru) {
+    return false;
+  }
+  return RegExp(r'auth|api.?key|user.?id|credential|401|403')
+      .hasMatch((error ?? '').toLowerCase());
+}
+
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
 
@@ -25,6 +33,8 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   List<Post> _posts = const [];
   List<BooruSource> _sources = const [];
+  List<BooruSource> _failedSources = const [];
+  Map<BooruSource, String> _sourceErrors = const {};
   BooruSource? _sourceFilter;
   _FeedOrder _order = _FeedOrder.popular;
   bool _loading = true;
@@ -72,13 +82,32 @@ class _FeedScreenState extends State<FeedScreen> {
       final seen = <String>{};
       final unique = posts.where((post) => seen.add(post.uniqueId)).toList();
       _sortPosts(unique);
+      final authFailures = result.entries
+          .where((entry) => entry.value.failed)
+          .where((entry) => _sourceRequiresCredentials(
+                entry.key,
+                entry.value.errorMessage,
+              ))
+          .map((entry) => entry.key)
+          .toList();
       if (!mounted) return;
       setState(() {
         _sources = sources;
         _posts = unique;
+        _failedSources = result.entries
+            .where((entry) => entry.value.failed)
+            .map((entry) => entry.key)
+            .toList();
+        _sourceErrors = {
+          for (final entry in result.entries)
+            if (entry.value.errorMessage != null)
+              entry.key: entry.value.errorMessage!,
+        };
         _loading = false;
         if (result.values.every((sourceResult) => sourceResult.failed)) {
-          _error = 'Your booru sources could not be reached. Pull to try again.';
+          _error = authFailures.isNotEmpty
+              ? '${authFailures.map((source) => source.shortName).join(', ')} needs API credentials to load the feed.'
+              : 'Your booru sources could not be reached. Try again.';
         }
       });
     } catch (_) {
@@ -136,6 +165,12 @@ class _FeedScreenState extends State<FeedScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final visible = _visiblePosts;
+    final authFailedSources = _failedSources
+        .where((source) => _sourceRequiresCredentials(
+              source,
+              _sourceErrors[source],
+            ))
+        .toList();
     final top = MediaQuery.of(context).padding.top;
 
     return PageBackground(
@@ -143,9 +178,11 @@ class _FeedScreenState extends State<FeedScreen> {
         onRefresh: _loadFeed,
         color: theme.colorScheme.primary,
         child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
+          physics: visible.isEmpty && !_loading
+              ? const ClampingScrollPhysics()
+              : const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
@@ -368,6 +405,19 @@ class _FeedScreenState extends State<FeedScreen> {
                 ),
               ),
             ),
+            if (_failedSources.isNotEmpty &&
+                !_loading &&
+                _failedSources.length < _sources.length)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 2, 20, 12),
+                  child: _SourceFailureNotice(
+                    sources: _failedSources,
+                    errors: _sourceErrors,
+                    onRetry: _loadFeed,
+                  ),
+                ),
+              ),
             if (_loading)
               SliverFillRemaining(
                 hasScrollBody: false,
@@ -389,11 +439,24 @@ class _FeedScreenState extends State<FeedScreen> {
                   icon: Icons.cloud_off_rounded,
                   title: 'Feed unavailable',
                   message: _error!,
-                  action: FilledButton.icon(
-                    onPressed: _loadFeed,
-                    icon: const Icon(Icons.refresh_rounded),
-                    label: const Text('Try again'),
-                  ),
+                  action: authFailedSources.isNotEmpty
+                      ? Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          children: authFailedSources
+                              .map((source) => FilledButton.icon(
+                                    onPressed: () =>
+                                        context.push('/auth/${source.name}'),
+                                    icon: const Icon(Icons.key_rounded),
+                                    label: Text('Connect ${source.shortName}'),
+                                  ))
+                              .toList(),
+                        )
+                      : FilledButton.icon(
+                          onPressed: _loadFeed,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Try again'),
+                        ),
                 ),
               )
             else if (visible.isEmpty)
@@ -438,6 +501,67 @@ class _FeedScreenState extends State<FeedScreen> {
       _sortPosts(_posts);
     });
     HapticFeedback.selectionClick();
+  }
+}
+
+class _SourceFailureNotice extends StatelessWidget {
+  final List<BooruSource> sources;
+  final Map<BooruSource, String> errors;
+  final VoidCallback onRetry;
+
+  const _SourceFailureNotice({
+    required this.sources,
+    required this.errors,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final needsCredentials = sources
+        .where((source) => _sourceRequiresCredentials(source, errors[source]))
+        .toList();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer.withOpacity(0.36),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.colorScheme.error.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off_rounded,
+              size: 18, color: theme.colorScheme.error),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              needsCredentials.isNotEmpty
+                  ? '${needsCredentials.map((source) => source.shortName).join(', ')} needs API credentials. Feed results may be incomplete.'
+                  : '${sources.map((source) => source.shortName).join(', ')} unavailable. Feed results may be incomplete.',
+              style: theme.textTheme.labelMedium,
+            ),
+          ),
+          if (needsCredentials.isNotEmpty)
+            for (final source in needsCredentials)
+              IconButton(
+                tooltip: 'Connect ${source.shortName}',
+                onPressed: () => context.push('/auth/${source.name}'),
+                icon: const Icon(Icons.key_rounded, size: 18),
+                color: theme.colorScheme.primary,
+                visualDensity: VisualDensity.compact,
+              )
+          else
+            IconButton(
+              tooltip: 'Retry feed',
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              color: theme.colorScheme.primary,
+              visualDensity: VisualDensity.compact,
+            ),
+        ],
+      ),
+    );
   }
 }
 

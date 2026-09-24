@@ -151,7 +151,9 @@ class _SearchScreenState extends State<SearchScreen>
 
                 return CustomScrollView(
                   controller: _scrollController,
-                  physics: const BouncingScrollPhysics(),
+                  // Avoid iOS bounce exposing an enlarging blank area when
+                  // the current search has no cards to scroll through.
+                  physics: const ClampingScrollPhysics(),
                   // Key so grid doesn't rebuild on every state change that
                   // isn't changing the post list
                   slivers: [
@@ -192,7 +194,18 @@ class _SearchScreenState extends State<SearchScreen>
                       )
                     else if (state.posts.isEmpty &&
                         state.status == SearchStatus.success)
-                      const SliverFillRemaining(child: _NoResultsState())
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _NoResultsState(
+                          failedSources: state.failedSources,
+                          sourceErrors: state.sourceErrors,
+                          onRetry: () => context
+                              .read<SearchBloc>()
+                              .add(SearchRefreshed()),
+                          onConnect: (source) =>
+                              context.push('/auth/${source.name}'),
+                        ),
+                      )
                     else ...[
                       PostGridSliver(
                         // Stable key: only rebuild when posts list actually
@@ -230,7 +243,8 @@ class _SearchScreenState extends State<SearchScreen>
                         ),
                     ],
 
-                    const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                    if (state.posts.isNotEmpty)
+                      const SliverToBoxAdapter(child: SizedBox(height: 100)),
                   ],
                 );
               },
@@ -659,7 +673,7 @@ class _SourceChips extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
+        physics: const ClampingScrollPhysics(),
         child: Row(
           children: BooruSource.values.take(4).map((source) {
             final isActive = state.activeSources.contains(source);
@@ -741,6 +755,14 @@ class _SourceChip extends StatelessWidget {
 
 // ─── Results Header ───────────────────────────────────────────────────────
 
+bool _sourceNeedsCredentials(BooruSource source, String? error) {
+  if (source != BooruSource.rule34xxx && source != BooruSource.gelbooru) {
+    return false;
+  }
+  final message = error?.toLowerCase() ?? '';
+  return RegExp(r'auth|api.?key|user.?id|credential|401|403').hasMatch(message);
+}
+
 class _ResultsHeader extends StatelessWidget {
   final SearchState state;
   const _ResultsHeader({required this.state});
@@ -752,6 +774,12 @@ class _ResultsHeader extends StatelessWidget {
         .map((entry) => '${entry.key.shortName} ${_formatTagCount(entry.value)}')
         .join('  ·  ');
     final combinedTagCount = state.tagCounts.values.fold<int>(0, (sum, count) => sum + count);
+    final authSources = state.failedSources
+        .where((source) => _sourceNeedsCredentials(
+              source,
+              state.sourceErrors[source],
+            ))
+        .toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
       child: Column(
@@ -808,19 +836,51 @@ class _ResultsHeader extends StatelessWidget {
                   border:
                       Border.all(color: AppColors.warning.withOpacity(0.3)),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.error_outline_rounded,
-                        size: 14, color: AppColors.warning),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${state.failedSources.map((s) => s.shortName).join(', ')} failed — results may be incomplete.',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurface,
+                    Row(
+                      children: [
+                        const Icon(Icons.error_outline_rounded,
+                            size: 14, color: AppColors.warning),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            authSources.isNotEmpty
+                                ? '${authSources.map((s) => s.shortName).join(', ')} needs API credentials — results may be incomplete.'
+                                : '${state.failedSources.map((s) => s.shortName).join(', ')} unavailable — results may be incomplete.',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
+                    if (authSources.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: authSources
+                            .map((source) => TextButton.icon(
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  onPressed: () => context.push(
+                                    '/auth/${source.name}',
+                                  ),
+                                  icon: const Icon(Icons.key_rounded, size: 14),
+                                  label: Text('Connect ${source.shortName}'),
+                                ))
+                            .toList(),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -999,30 +1059,82 @@ class _ErrorState extends StatelessWidget {
 }
 
 class _NoResultsState extends StatelessWidget {
-  const _NoResultsState();
+  final List<BooruSource> failedSources;
+  final Map<BooruSource, String> sourceErrors;
+  final VoidCallback onRetry;
+  final ValueChanged<BooruSource> onConnect;
+
+  const _NoResultsState({
+    required this.failedSources,
+    required this.sourceErrors,
+    required this.onRetry,
+    required this.onConnect,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authSources = failedSources
+        .where((source) => _sourceNeedsCredentials(
+              source,
+              sourceErrors[source],
+            ))
+        .toList();
+    final hasFailures = failedSources.isNotEmpty;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.search_off_rounded,
+            hasFailures ? Icons.cloud_off_rounded : Icons.search_off_rounded,
             size: 52,
-            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.35),
+            color: hasFailures
+                ? theme.colorScheme.error.withOpacity(0.6)
+                : theme.colorScheme.onSurfaceVariant.withOpacity(0.35),
           ),
           const SizedBox(height: 16),
-          Text('No results found', style: theme.textTheme.headlineMedium),
+          Text(
+            hasFailures
+                ? (authSources.isNotEmpty ? 'Connect this source' : 'Source unavailable')
+                : 'No results found',
+            style: theme.textTheme.headlineMedium,
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 8),
           Text(
-            'Try different tags or change\nyour active sources',
+            !hasFailures
+                ? 'Try different tags or change\nyour active sources'
+                : authSources.isNotEmpty
+                    ? '${authSources.map((s) => s.shortName).join(' and ')} requires API credentials before it can return posts.'
+                    : '${failedSources.map((s) => s.shortName).join(', ')} could not return a usable response. Check your connection and try again.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
           ),
+          if (authSources.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: authSources
+                  .map((source) => OutlinedButton.icon(
+                        onPressed: () => onConnect(source),
+                        icon: const Icon(Icons.key_rounded, size: 16),
+                        label: Text('Connect ${source.shortName}'),
+                      ))
+                  .toList(),
+            ),
+          ] else if (hasFailures) ...[
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 17),
+              label: const Text('Try again'),
+            ),
+          ],
         ],
       ),
     );

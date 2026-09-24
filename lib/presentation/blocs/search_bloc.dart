@@ -70,6 +70,7 @@ class SearchState extends Equatable {
   final Map<BooruSource, int> pageBySource;
   final Map<BooruSource, bool> hasMoreBySource;
   final List<BooruSource> failedSources;
+  final Map<BooruSource, String> sourceErrors;
   final String? errorMessage;
   final List<String> tagSuggestions;
   final Map<BooruSource, int> tagCounts;
@@ -85,6 +86,7 @@ class SearchState extends Equatable {
     this.pageBySource = const {},
     this.hasMoreBySource = const {},
     this.failedSources = const [],
+    this.sourceErrors = const {},
     this.errorMessage,
     this.tagSuggestions = const [],
     this.tagCounts = const {},
@@ -112,6 +114,7 @@ class SearchState extends Equatable {
     Map<BooruSource, int>? pageBySource,
     Map<BooruSource, bool>? hasMoreBySource,
     List<BooruSource>? failedSources,
+    Map<BooruSource, String>? sourceErrors,
     String? errorMessage,
     bool clearError = false,
     List<String>? tagSuggestions,
@@ -129,6 +132,7 @@ class SearchState extends Equatable {
       pageBySource: pageBySource ?? this.pageBySource,
       hasMoreBySource: hasMoreBySource ?? this.hasMoreBySource,
       failedSources: failedSources ?? this.failedSources,
+      sourceErrors: sourceErrors ?? this.sourceErrors,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       tagSuggestions: tagSuggestions ?? this.tagSuggestions,
       tagCounts: clearTagCounts ? const {} : (tagCounts ?? this.tagCounts),
@@ -162,6 +166,7 @@ class SearchState extends Equatable {
         pageBySource,
         hasMoreBySource,
         failedSources,
+        sourceErrors,
         errorMessage,
         tagSuggestions,
         tagCounts,
@@ -218,6 +223,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       pageBySource: {for (final s in event.sources) s: 0},
       hasMoreBySource: {for (final s in event.sources) s: true},
       failedSources: const [],
+      sourceErrors: const {},
       clearError: true,
       tagSuggestions: [],
       clearTagCounts: true,
@@ -238,6 +244,11 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       final deduped = _dedupeAgainst(const [], merged);
       final filtered = _applyBlacklist(deduped);
       final failed = perSource.entries.where((e) => e.value.failed).map((e) => e.key).toList();
+      final sourceErrors = {
+        for (final entry in perSource.entries)
+          if (entry.value.errorMessage != null)
+            entry.key: entry.value.errorMessage!,
+      };
 
       emit(state.copyWith(
         status: SearchStatus.success,
@@ -252,6 +263,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
           for (final entry in perSource.entries) entry.key: entry.value.posts.isNotEmpty,
         },
         failedSources: failed,
+        sourceErrors: sourceErrors,
       ));
 
       final tagParts = query.tags;
@@ -379,6 +391,11 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       sources.add(event.source);
     }
     emit(state.copyWith(activeSources: sources));
+    // Search chips are live filters: changing one should refresh an active
+    // query immediately instead of leaving results from the old source set.
+    if (state.tagString.trim().isNotEmpty) {
+      add(SearchSubmitted(state.tagString, sources));
+    }
   }
 
   void _onFilterChanged(
