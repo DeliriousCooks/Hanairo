@@ -2,6 +2,14 @@ import 'dart:async';
 import '../../domain/entities/post.dart';
 import '../datasources/booru_api.dart';
 import '../../core/utils/logger.dart';
+import '../../core/tags/tag_translator.dart';
+
+class SourceResult {
+  final List<Post> posts;
+  final bool failed;
+  final String? errorMessage;
+  const SourceResult(this.posts, {this.failed = false, this.errorMessage});
+}
 
 class SearchRepository {
   final Map<BooruSource, BooruDataSource> _sources;
@@ -16,21 +24,45 @@ class SearchRepository {
 
   BooruDataSource sourceFor(BooruSource source) => _sources[source]!;
 
-  /// Search multiple sources concurrently and merge results
-  Future<List<Post>> search(SearchQuery query) async {
-    final futures = query.sources.map((source) async {
+  /// Search multiple sources concurrently, keeping each source's results
+  /// separate. Callers that need pagination should use this instead of
+  /// [search], since merging all sources into one flat list makes it
+  /// impossible to tell which individual sources still have more pages.
+  Future<Map<BooruSource, List<Post>>> searchPerSource(SearchQuery query) async {
+    final full = await searchPerSourceDetailed(query);
+    return full.map((source, result) => MapEntry(source, result.posts));
+  }
+
+  /// Like [searchPerSource], but distinguishes "a source genuinely returned
+  /// zero matches" from "a source's request failed" (network error, auth
+  /// error, rate limit, etc). Callers that want to surface real errors to
+  /// the user - instead of silently showing them as "0 results" - should
+  /// use this.
+  Future<Map<BooruSource, SourceResult>> searchPerSourceDetailed(SearchQuery query) async {
+    final entries = await Future.wait(query.sources.map((source) async {
       final ds = _sources[source];
-      if (ds == null) return <Post>[];
+      if (ds == null) return MapEntry(source, const SourceResult([]));
       try {
-        return await ds.search(query).timeout(const Duration(seconds: 25));
+        final posts = await ds.search(query).timeout(const Duration(seconds: 25));
+        return MapEntry(source, SourceResult(posts));
       } catch (e) {
         AppLogger.error('Source $source timed out or failed', e);
-        return <Post>[];
+        return MapEntry(
+          source,
+          SourceResult([], failed: true, errorMessage: e.toString()),
+        );
       }
-    });
+    }));
+    return Map.fromEntries(entries);
+  }
 
-    final results = await Future.wait(futures);
-    final merged = results.expand((r) => r).toList();
+  /// Search multiple sources concurrently and merge results into one
+  /// flat, score-sorted list. Convenient for one-shot searches, but does
+  /// not carry enough information to paginate correctly across sources -
+  /// use [searchPerSource] for that.
+  Future<List<Post>> search(SearchQuery query) async {
+    final perSource = await searchPerSource(query);
+    final merged = perSource.values.expand((r) => r).toList();
 
     // Sort by score descending when merging multiple sources
     if (query.sources.length > 1) {
@@ -66,6 +98,23 @@ class SearchRepository {
     }
 
     return merged.take(30).toList();
+  }
+
+  /// Fetches each selected site's count for one exact tag. Counts are omitted
+  /// when a site does not return an exact match or its tag endpoint is down.
+  Future<Map<BooruSource, int>> getTagCounts(
+    String tag,
+    List<BooruSource> sources,
+  ) async {
+    final results = await Future.wait(sources.map((source) async {
+      final translated = TagTranslator.translate([tag], source);
+      if (translated.isEmpty) return null;
+      final count = await _sources[source]
+          ?.getTagCount(translated.single)
+          .timeout(const Duration(seconds: 8), onTimeout: () => null);
+      return count == null ? null : MapEntry(source, count);
+    }));
+    return Map.fromEntries(results.whereType<MapEntry<BooruSource, int>>());
   }
 
   Future<bool> login(BooruSource source, String username, String credential) {

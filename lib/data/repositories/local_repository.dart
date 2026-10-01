@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../domain/entities/post.dart';
@@ -15,6 +16,9 @@ class LocalRepository {
   late Box<String> _blacklist;
   late Box<dynamic> _settings;
   final _secureStorage = const FlutterSecureStorage();
+  final ValueNotifier<int> favoritesRevision = ValueNotifier<int>(0);
+  final ValueNotifier<int> favoriteTagsRevision = ValueNotifier<int>(0);
+  final ValueNotifier<int> gridColumnsRevision = ValueNotifier<int>(0);
 
   Future<void> init() async {
     await Hive.initFlutter();
@@ -29,10 +33,12 @@ class LocalRepository {
   Future<void> addFavorite(Post post) async {
     final json = jsonEncode(_postToMap(post));
     await _favorites.put(post.uniqueId, json);
+    favoritesRevision.value++;
   }
 
   Future<void> removeFavorite(String uniqueId) async {
     await _favorites.delete(uniqueId);
+    favoritesRevision.value++;
   }
 
   bool isFavorite(String uniqueId) => _favorites.containsKey(uniqueId);
@@ -85,6 +91,51 @@ class LocalRepository {
     }
   }
 
+  // ─── Favorite Tags ──────────────────────────────────────────────────────────
+
+  List<String> getFavoriteTags() {
+    final raw = _settings.get('favorite_tags');
+    if (raw is List) {
+      return raw
+          .whereType<String>()
+          .map(_normalizeFavoriteTag)
+          .where((tag) => tag.isNotEmpty)
+          .toList();
+    }
+    if (raw is! String || raw.isEmpty) return <String>[];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return <String>[];
+      return decoded
+          .whereType<String>()
+          .map(_normalizeFavoriteTag)
+          .where((tag) => tag.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return <String>[];
+    }
+  }
+
+  bool isFavoriteTag(String tag) =>
+      getFavoriteTags().contains(_normalizeFavoriteTag(tag));
+
+  Future<void> toggleFavoriteTag(String tag) async {
+    final normalized = _normalizeFavoriteTag(tag);
+    if (normalized.isEmpty) return;
+    final tags = getFavoriteTags();
+    if (tags.contains(normalized)) {
+      tags.remove(normalized);
+    } else {
+      tags.insert(0, normalized);
+      if (tags.length > 30) tags.removeLast();
+    }
+    await setSetting<String>('favorite_tags', jsonEncode(tags));
+    favoriteTagsRevision.value++;
+  }
+
+  String _normalizeFavoriteTag(String tag) =>
+      tag.trim().replaceAll(RegExp(r'\s+'), '_');
+
   // ─── Blacklist ───────────────────────────────────────────────────────────────
 
   Future<void> addToBlacklist(String tag) async {
@@ -127,12 +178,27 @@ class LocalRepository {
   }
 
   // Grid columns
-  int getGridColumns() => getSetting<int>('grid_columns', 3);
-  Future<void> setGridColumns(int cols) => setSetting('grid_columns', cols);
+  int getGridColumns() => getSetting<int>('grid_columns', 2).clamp(2, 4).toInt();
+  Future<void> setGridColumns(int cols) async {
+    await setSetting<int>('grid_columns', cols.clamp(2, 4).toInt());
+    gridColumnsRevision.value++;
+  }
 
   // Theme
   bool isDarkMode() => getSetting<bool>('dark_mode', true);
   Future<void> setDarkMode(bool value) => setSetting('dark_mode', value);
+
+  // Accent color (stored as the AccentColor enum's name, e.g. "violet")
+  String getAccentColorName() => getSetting<String>('accent_color', 'violet');
+  Future<void> setAccentColorName(String value) => setSetting('accent_color', value);
+
+  // Liquid Glass thickness (stored as the GlassThickness enum's name)
+  String getGlassThicknessName() => getSetting<String>('glass_thickness', 'regular');
+  Future<void> setGlassThicknessName(String value) => setSetting('glass_thickness', value);
+
+  // Theme preset / wallpaper (stored as the ThemePreset enum's name)
+  String getThemePresetName() => getSetting<String>('theme_preset', 'defaultPreset');
+  Future<void> setThemePresetName(String value) => setSetting('theme_preset', value);
 
   // Rating filter
   String getRatingFilter() => getSetting<String>('rating_filter', 'explicit');

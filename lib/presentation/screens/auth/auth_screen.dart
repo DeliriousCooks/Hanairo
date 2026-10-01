@@ -34,9 +34,20 @@ class _AuthScreenState extends State<AuthScreen> {
     final creds = await repo.loadCredentials();
     final sourceCreds = creds[widget.source.name];
     if (sourceCreds != null) {
+      final username = sourceCreds['username'] ?? '';
+      final credential = sourceCreds['credential'] ?? '';
+      final connected = widget.source == BooruSource.rule34xxx
+          ? await context
+              .read<SearchRepository>()
+              .login(widget.source, username, credential)
+          : true;
+      if (!mounted) return;
       setState(() {
-        _usernameCtrl.text = sourceCreds['username'] ?? '';
-        _loggedIn = true;
+        _usernameCtrl.text = username;
+        _loggedIn = connected;
+        if (!connected) {
+          _error = 'Saved Rule34 credentials could not be verified. Check your User ID and API key.';
+        }
       });
     }
   }
@@ -138,20 +149,32 @@ class _AuthScreenState extends State<AuthScreen> {
               _AuthInstructions(source: source),
               const SizedBox(height: 24),
 
-              Text('Username', style: theme.textTheme.labelLarge),
+              Text(
+                source == BooruSource.rule34xxx ||
+                        source == BooruSource.gelbooru
+                    ? 'User ID'
+                    : 'Username',
+                style: theme.textTheme.labelLarge,
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: _usernameCtrl,
-                decoration: const InputDecoration(
-                  hintText: 'Your username',
-                  prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
+                decoration: InputDecoration(
+                  hintText: source == BooruSource.rule34xxx ||
+                          source == BooruSource.gelbooru
+                      ? 'Your numeric user ID'
+                      : 'Your username',
+                  prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
                 ),
-                keyboardType: TextInputType.emailAddress,
+                keyboardType: source == BooruSource.rule34xxx ||
+                        source == BooruSource.gelbooru
+                    ? TextInputType.number
+                    : TextInputType.emailAddress,
                 autocorrect: false,
               ),
               const SizedBox(height: 16),
               Text(
-                source == BooruSource.gelbooru ? 'User ID' : 'API Key',
+                'API Key',
                 style: theme.textTheme.labelLarge,
               ),
               const SizedBox(height: 8),
@@ -159,9 +182,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 controller: _credCtrl,
                 obscureText: _obscure,
                 decoration: InputDecoration(
-                  hintText: source == BooruSource.gelbooru
-                      ? 'Your user ID number'
-                      : 'Your API key',
+                  hintText: 'Your API key',
                   prefixIcon:
                       const Icon(Icons.key_outlined, size: 20),
                   suffixIcon: IconButton(
@@ -276,7 +297,13 @@ class _SourceHeader extends StatelessWidget {
               Text(source.domain, style: theme.textTheme.headlineMedium),
               const SizedBox(height: 4),
               Text(
-                'Connect your account for higher limits & favorites',
+                source == BooruSource.rule34xxx
+                    ? 'API credentials are required to search Rule34.xxx.'
+                    : source == BooruSource.gelbooru
+                        ? 'Gelbooru may require API credentials for search access.'
+                        : source == BooruSource.paheal
+                            ? 'Paheal search works without an account.'
+                            : 'Connect for higher limits and account features.',
                 style: theme.textTheme.bodyMedium,
               ),
             ],
@@ -294,7 +321,7 @@ class _AuthInstructions extends StatelessWidget {
   String get _instructions {
     switch (source) {
       case BooruSource.rule34xxx:
-        return 'Go to rule34.xxx → My Account → Account Options → API Access. Copy your username and API key.';
+        return 'Go to rule34.xxx → My Account → Options → API Access Credentials. Copy your User ID and API key.';
       case BooruSource.e621:
         return 'Go to e621.net → Account → Manage API Access → Generate Key. Enter your username and the generated API key.';
       case BooruSource.gelbooru:

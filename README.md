@@ -1,218 +1,97 @@
-# 🎨 Booru Gallery — Multi-Source Image Aggregator
+# BooruWave UI update v18
 
-A premium Flutter app aggregating Rule34.xxx, e621, Gelbooru, and Paheal with Apple-level aesthetics.
+This is the v18 source overlay, based on v17. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
 
-## Signing Details (Pre-configured from your files)
+## v18 finishing fixes
 
-| Field | Value |
-|-------|-------|
-| **Bundle ID** | `app.starfruit8199.snowleopard5722` |
-| **Team** | qa ba |
-| **Team ID** | `SE4UL3VJW5` |
-| **Cert CN** | `iPhone Distribution: qa ba (SE4UL3VJW5)` |
-| **Profile UUID** | `e52b0627-df22-4cd5-b59f-a1224fad20ed` |
-| **Profile Type** | Ad Hoc |
-| **Provisioned Device** | `00008150-00150DAE3ED8401C` |
-| **Cert Expiry** | September 10, 2027 |
+- Vertically moved the search field itself down 12 logical pixels inside its unchanged-height dock so its hint and typed text line up with the search and filter buttons.
+- Added horizontal swipes between the main tabs. A right swipe from Search returns to Feed; a left swipe moves to Favorites. The keyboard is dismissed during tab changes.
+- Added a Recent Searches list to the empty Search screen. Tap a previous query to run it again, or Clear to erase local search history.
+- Reset stale results on a fresh blank Search visit so the empty/recent state appears consistently.
+# BooruWave UI update v17
 
----
+This is the v17 source overlay, based on v16. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
 
-## 🚀 GitHub Actions — Setting Up Secrets
+## v17 search-field alignment fix
 
-### Step 1: Encode your files to base64
+- Vertically adjusted the search hint and entered text so they appear optically centered in the glass search dock.
+# BooruWave UI update v16
 
-On macOS/Linux terminal:
-```bash
-# Encode your .p12
-base64 -i certificate_00008150-00150DAE3ED8401C.p12 | pbcopy
-# → paste this as P12_BASE64 secret
+This is the v16 source overlay, based on v15. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
 
-# Encode your .mobileprovision
-base64 -i provision_1.mobileprovision | pbcopy
-# → paste this as MOBILEPROVISION_BASE64 secret
-```
+## v16 search-field finishing fix
 
-On Windows (PowerShell):
-```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("certificate_00008150-00150DAE3ED8401C.p12")) | Set-Clipboard
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("provision_1.mobileprovision")) | Set-Clipboard
-```
+- Removed the inherited filled-card background from the inline “Search tags…” field. The placeholder and entered text now sit directly on the main glass search dock, matching the supplied edited reference; the search dock, search button, filter button, and tag chips retain their own surfaces.
+# BooruWave UI update v15
 
-### Step 2: Add GitHub Secrets
+This is the v15 source overlay, based on v14. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
 
-Go to your repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+## v15 finishing fixes
 
-Add these 4 secrets:
+- Put selected search tags on their own horizontally scrollable row, auto-scroll to the newest tag, and keep the plain text entry borderless so its hint can never cover the chips.
+- Added a clear-search control that removes all chips and text and returns Search to its empty state while preserving source and filter choices; in-flight results can no longer repopulate a cleared search.
+- Kept autocomplete text separate from the submitted search query so pending suggestions can't corrupt result counts or interrupt a search after Enter.
+- Fixed favorite-tag persistence when the list is empty (the previous empty-list value was immutable, so the first favorite could not be inserted). Added compatibility for older list-shaped stored values and made tag tap/hold use a Material ink gesture.
+- Painted the glass edge above the clipped blur so rounded borders stay continuous, strengthened the compact search source-chip outlines, and reduced the bottom dock and selected-tab footprint.
+- Updated Search when a tag link changes the route while Search is already open.
 
-| Secret Name | Value |
-|-------------|-------|
-| `P12_BASE64` | Output of base64 encoding your `.p12` |
-| `P12_PASSWORD` | `kravasign` |
-| `MOBILEPROVISION_BASE64` | Output of base64 encoding your `.mobileprovision` |
-| `KEYCHAIN_PASSWORD` | Any random string, e.g. `ci_keychain_2024` |
+The original v14 notes follow.
 
-### Step 3: Push to trigger build
+This is a source overlay for the existing Flutter app. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
 
-```bash
-git add .
-git commit -m "Initial commit"
-git push origin main
-```
+## Changes in v14
 
-Or go to **Actions** tab → **Build & Sign iOS IPA** → **Run workflow** → **Run workflow**
+- Reworked Search into a more substantial floating glass dock: separate search and filter controls, a plain inline query field, horizontally scrolling tag chips, and rounded suggestions.
+- Increased tab dock contrast and label legibility so the icons and names stay clear against changing content behind the glass.
+- Added Posts and Favorite Tags sections to Favorites. Tap a post tag to search it; press and hold briefly to save or remove it from Favorite Tags.
+- Added a persistent 2 / 3 / 4 column control to Feed, sharing the saved Grid Columns preference with Settings and Favorites. The default remains the existing two-column feed.
+- Added a single-post feed mode that loads the original image URL and fits the complete image inside the media area. Double-tap to favorite and press and hold to export an image or video to Photos.
+- Reused the Photos export helper in both the single-post feed and full-screen viewer, including the existing WebM-to-MP4 conversion path.
+- Fixed the missing closing parenthesis in the search input reported by the iOS release build.
 
-### Step 4: Download your IPA
+## Finishing fixes
 
-Actions tab → click the completed run → scroll to **Artifacts** → download `BooruGallery-IPA-*`
+- Removed the extra inset search-field box so tags and query text sit in the main glass search dock. Tapping a suggestion adds it to the query and keeps Search open; search submission now happens on the keyboard's Search/Enter action.
+- Made favorite-tag gestures work both in the post tag panel and on the visible tag chips. Tap to search; press and hold to save or remove the tag, with an immediate confirmation and saved-state indicator.
+- Increased the glass dock's edge contrast and inset spacing around the tab highlight so the tab bar border stays visible.
+- Tied video playback to the active viewer page and single-post feed visibility. Swiping pauses and mutes the old video; the feed resumes it only if that same post remains in view.
 
-### Step 5: Install on your device
+## Changes in v13
 
-Since this is **Ad Hoc**, install via:
-```bash
-# Via ideviceinstaller (macOS)
-ideviceinstaller -i BooruGallery_AdHoc_main_abc1234.ipa
+- Added a persistent grid / single-column feed switch.
+- Replaced the feed's generic “Following” concept with a Saved Tag Mix that loads recent posts for saved searches. Save or remove a tag from the search results header; saved tags also appear as quick links on Feed.
+- Kept stories out of the Feed.
+- Enlarged the search input and constrained its width so the typed text has room beside chips.
+- Dismissed the keyboard on search submission and before opening a post.
+- Added exact tag counts to the first five autocomplete suggestions, summed across enabled sources. Search result headers show the combined tag count in bold with per-source counts below.
+- Validated Rule34.xxx's numeric User ID and API key against its API before reporting an account connection as successful.
+- Updated WebM-to-MP4 conversion success checks to use FFmpegKit's `ReturnCode.isValueSuccess()` API, avoiding the unresolved `ReturnCode` symbol from the previous iOS build log.
 
-# Via AltStore / Sideloadly (easier, no dev tools needed)
-# Drag the IPA into Sideloadly with your device connected
+The Rule34 account form uses its API User ID and generated API key because the site's API requires credentials for API requests. See the [Rule34 API help](https://rule34.xxx/?page=help&topic=dapi) and [API key announcement](https://rule34.xxx/index.php?id=9793&page=forum&pid=45&s=view).
 
-# Via Apple Configurator 2 (Mac App Store, free)
-# Add → App → choose the IPA
-```
+## Changes in v12
 
-> ⚠️ **Ad Hoc** means it installs only on the device UDID `00008150-00150DAE3ED8401C` (the device registered in your provisioning profile). To add more devices you need to update your provisioning profile at developer.apple.com.
+- Added an adaptive, clipped glass surface for the floating navigation dock, home quick-search control, and search header/input.
+- Kept the selected tab highlight compact, with a softer tint in light mode and a contained accent in dark mode.
+- Added the Petal theme preset to match the newer pastel direction; OLED Black remains available.
+- Added light haptic feedback when changing destinations.
 
----
+The glass surfaces use Flutter's `BackdropFilter` with translucent fills and edge highlights. They are a Liquid Glass-inspired cross-platform treatment, not Apple's native refractive `UIGlassEffect`. Flutter's current iOS compatibility page says iOS 26 is supported and tracks Liquid Glass as a feature not yet fully implemented in the framework. The same UI has a fallback on older iOS and Android. No iOS 27-specific API is assumed.
 
-## 🛠 Local Development
+Glass is limited to navigation and search controls so the art and feed content remain visually clear.
 
-### Prerequisites
-- Flutter 3.19+: `flutter --version`
-- Xcode 15+ (for iOS)
-- CocoaPods: `sudo gem install cocoapods`
+## Changes
 
-### Run
-```bash
-flutter pub get
-cd ios && pod install && cd ..
-flutter run                    # debug on simulator
-flutter run --release          # release on connected device
-```
+- Gave each tab a fixed, compact highlight capsule and made the dock surface opaque enough to keep the background colors from blending across the bar.
+- Added a short fade and lift animation when changing tabs.
+- Stopped empty Feed and Search screens from bouncing into a larger blank area.
+- Made source chips refresh an active query immediately.
+- Added adjacent-post preloading and clipped, non-bouncing paging in the full-screen viewer.
+- Updated Paheal post and tag requests to Shimmie's current API routes.
+- Kept API errors and authentication failures visible instead of showing them as zero results. Failed Rule34 and Gelbooru requests include a direct account connection action.
+- Fixed Gelbooru credentials to use User ID and API Key fields, and passed saved Rule34/Gelbooru credentials to search, tag-count, and suggestion requests.
 
-### Build IPA locally (requires macOS with your cert imported)
-```bash
-# Import your cert into macOS keychain first:
-security import certificate_00008150-00150DAE3ED8401C.p12 \
-  -P kravasign -T /usr/bin/codesign
+Rule34 currently requires API credentials for API search requests. Gelbooru may require them at times. The auth screens explain where to retrieve each site's credentials.
 
-# Install provisioning profile:
-cp provision_1.mobileprovision \
-  ~/Library/MobileDevice/Provisioning\ Profiles/1d6050ac-28cb-4ab9-9e0b-82d23201f041.mobileprovision
 
-# Build:
-flutter build ios --release --no-codesign
-cd ios
-xcodebuild archive \
-  -workspace Runner.xcworkspace \
-  -scheme Runner \
-  -configuration Release \
-  -archivePath /tmp/BooruGallery.xcarchive \
-  CODE_SIGN_STYLE=Manual \
-  DEVELOPMENT_TEAM=UDFVUP2APY \
-  CODE_SIGN_IDENTITY="Apple Distribution: xiaoling yan (UDFVUP2APY)" \
-  PROVISIONING_PROFILE_SPECIFIER="1d6050ac-28cb-4ab9-9e0b-82d23201f041" \
-  PRODUCT_BUNDLE_IDENTIFIER=app.coral4330.carrot5939
 
-xcodebuild -exportArchive \
-  -archivePath /tmp/BooruGallery.xcarchive \
-  -exportPath build/ios/ipa \
-  -exportOptionsPlist ExportOptions.plist
-```
-
----
-
-## 📱 App Features
-
-### Sources
-| Source | Auth | Favorites | Voting | Rate Limit |
-|--------|------|-----------|--------|------------|
-| rule34.xxx | Username + API Key | ✗ (API limitation) | ✗ | Higher with auth |
-| e621.net | Username + API Key | ✅ | ✅ | 2 req/s anon, higher auth |
-| Gelbooru | User ID + API Key | ✅ (via API) | ✗ | Higher with auth |
-| Paheal | None needed | ✗ | ✗ | Anonymous |
-
-### How to get API keys
-- **Rule34.xxx**: My Account → Account Options → API Access → API Key
-- **e621**: Account → Manage API Access → Generate New Key  
-- **Gelbooru**: My Account → API → Your API key is shown
-
-### Search Syntax
-```
-# Single tag
-solo
-
-# Multiple tags (AND)
-solo animated
-
-# Score filter
-solo score:>=100
-
-# Exclusion
-solo -male
-
-# Rating
-solo rating:safe
-
-# Artist
-solo artist:john_doe
-
-# Character  
-solo character:rem_(re:zero)
-```
-
----
-
-## 🏗 Architecture
-
-```
-lib/
-├── core/
-│   ├── theme/           # AppTheme, AppColors, AppTextStyles
-│   └── utils/           # Logger
-├── data/
-│   ├── datasources/     # BooruDataSource impls (R34, e621, Gelb, Paheal)
-│   └── repositories/    # SearchRepository, LocalRepository
-├── domain/
-│   └── entities/        # Post, PostTag, SearchQuery, BooruSource
-└── presentation/
-    ├── blocs/           # SearchBloc (events/state)
-    ├── screens/
-    │   ├── home/        # Landing, recent searches, source selector
-    │   ├── search/      # Tag search, grid results, infinite scroll
-    │   ├── viewer/      # Full-screen gallery, video player, details panel
-    │   ├── favorites/   # Local saved posts grid
-    │   ├── settings/    # Theme, columns, blacklist, auth links
-    │   └── auth/        # Per-source login screen
-    └── widgets/
-        ├── common/      # GlassCard, SourceBadge
-        ├── grid/        # PostGrid, PostTile (with shimmer, badges)
-        └── search/      # SearchBarWidget, FilterSheet
-```
-
----
-
-## ⚠️ Troubleshooting
-
-**"No signing certificate found"**  
-→ Make sure `P12_BASE64` is the correct base64 of your .p12 (not the file path)
-
-**"Profile not found"**  
-→ Make sure `MOBILEPROVISION_BASE64` is correct. The profile UUID is `1d6050ac-28cb-4ab9-9e0b-82d23201f041`.
-
-**"Provisioned device does not match"**  
-→ Your Ad Hoc profile only covers UDID `00008150-00150DAE3ED8401C`. Install only on that device, or regenerate the profile with additional UDIDs at developer.apple.com.
-
-**Build timeout**  
-→ First build takes ~15-20min on GitHub Actions (pod install + full compile). Subsequent runs with cache ~8-12min.
-
-**Flutter pub get fails**  
-→ Some packages require network access. The `xml` package for Paheal XML parsing is included.

@@ -56,7 +56,7 @@ class Post extends Equatable {
   final List<PostTag> tags;
   final String? md5;
   final int? fileSize;
-  final String? source;
+  final String? sourceUrl;
   final DateTime? createdAt;
   final String? uploaderName;
   final int? uploaderId;
@@ -85,7 +85,7 @@ class Post extends Equatable {
     required this.tags,
     this.md5,
     this.fileSize,
-    this.source,
+    this.sourceUrl,
     this.createdAt,
     this.uploaderName,
     this.uploaderId,
@@ -144,7 +144,7 @@ class Post extends Equatable {
       tags: tags,
       md5: md5,
       fileSize: fileSize,
-      source: source.name,
+      sourceUrl: sourceUrl,
       createdAt: createdAt,
       uploaderName: uploaderName,
       uploaderId: uploaderId,
@@ -175,7 +175,7 @@ class SearchQuery extends Equatable {
     this.minScore,
     this.fileTypeFilter,
     this.page = 0,
-    this.limit = 40,
+    this.limit = 60,
   });
 
   String get tagString => tags.join(' ');

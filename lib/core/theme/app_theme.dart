@@ -155,26 +155,59 @@ class AppTextStyles {
 }
 
 class AppTheme {
-  static ThemeData get darkTheme {
+  /// Lightens or darkens [color] by [amount] (-1..1) in HSL lightness space.
+  static Color _adjustLightness(Color color, double amount) {
+    final hsl = HSLColor.fromColor(color);
+    final lightness = (hsl.lightness + amount).clamp(0.0, 1.0);
+    return hsl.withLightness(lightness).toColor();
+  }
+
+  /// Builds a full [ThemeData] for the given [brightness] using [accent] as
+  /// the primary color. This replaces the old static darkTheme/lightTheme
+  /// getters so the accent color picked in Settings applies everywhere.
+  static ThemeData build({required Brightness brightness, required Color accent, bool oled = false}) {
+    final isDark = brightness == Brightness.dark;
+    final accentLight = _adjustLightness(accent, 0.14);
+    final accentDark = _adjustLightness(accent, -0.18);
+    final accentContainer = isDark
+        ? Color.alphaBlend(accent.withOpacity(0.22), AppColors.darkBackground)
+        : Color.alphaBlend(accent.withOpacity(0.12), Colors.white);
+
+    return isDark
+        ? _darkTheme(accent, accentLight, accentDark, accentContainer, oled: oled)
+        : _lightTheme(accent, accentLight, accentDark, accentContainer);
+  }
+
+  static ThemeData _darkTheme(
+    Color accent,
+    Color accentLight,
+    Color accentDark,
+    Color accentContainer,
+    {bool oled = false}
+  ) {
+    final background = oled ? Colors.black : AppColors.darkBackground;
+    final surface = oled ? const Color(0xFF050505) : AppColors.darkSurface;
+    final card = oled ? const Color(0xFF0A0A0A) : AppColors.darkCard;
+    final border = oled ? const Color(0xFF202020) : AppColors.darkBorder;
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: AppColors.darkBackground,
-      colorScheme: const ColorScheme.dark(
-        primary: AppColors.primary,
+      scaffoldBackgroundColor: background,
+      colorScheme: ColorScheme.dark(
+        primary: accent,
         onPrimary: Colors.white,
-        primaryContainer: AppColors.primaryContainer,
-        onPrimaryContainer: AppColors.primaryLight,
+        primaryContainer: accentContainer,
+        onPrimaryContainer: accentLight,
         secondary: AppColors.secondary,
         onSecondary: Colors.black,
         secondaryContainer: AppColors.secondaryContainer,
-        surface: AppColors.darkSurface,
+        surface: surface,
         onSurface: AppColors.textPrimary,
         error: AppColors.error,
         onError: Colors.white,
-        outline: AppColors.darkBorder,
+        outline: border,
         outlineVariant: AppColors.darkDivider,
-        surfaceContainerHighest: AppColors.darkCard,
+        surfaceContainerHighest: card,
         onSurfaceVariant: AppColors.textSecondary,
       ),
       textTheme: _buildTextTheme(AppColors.textPrimary, AppColors.textSecondary),
@@ -196,31 +229,31 @@ class AppTheme {
         iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.darkSurface.withOpacity(0.95),
+        backgroundColor: surface.withOpacity(0.95),
         elevation: 0,
-        indicatorColor: AppColors.primaryContainer,
+        indicatorColor: accentContainer,
         labelTextStyle: WidgetStateProperty.all(
           AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
         ),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: AppColors.primary, size: 22);
+            return IconThemeData(color: accent, size: 22);
           }
           return const IconThemeData(color: AppColors.textTertiary, size: 22);
         }),
       ),
       cardTheme: CardThemeData(
-        color: AppColors.darkCard,
+        color: card,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.darkBorder, width: 0.5),
+          side: BorderSide(color: border, width: 0.5),
         ),
         clipBehavior: Clip.antiAlias,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.darkCard,
+        fillColor: card,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.darkBorder, width: 0.5),
@@ -231,7 +264,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide: BorderSide(color: accent, width: 1.5),
         ),
         hintStyle: AppTextStyles.bodyMedium.copyWith(
           color: AppColors.textTertiary,
@@ -240,7 +273,7 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.darkCard,
-        selectedColor: AppColors.primaryContainer,
+        selectedColor: accentContainer,
         disabledColor: AppColors.darkCardElevated,
         labelStyle: AppTextStyles.labelMedium.copyWith(color: AppColors.textSecondary),
         side: const BorderSide(color: AppColors.darkBorder, width: 0.5),
@@ -275,49 +308,54 @@ class AppTheme {
         behavior: SnackBarBehavior.floating,
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: AppColors.primary,
+        backgroundColor: accent,
         foregroundColor: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return AppColors.primary;
+          if (states.contains(WidgetState.selected)) return accent;
           return AppColors.textTertiary;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return AppColors.primaryContainer;
+          if (states.contains(WidgetState.selected)) return accentContainer;
           return AppColors.darkCard;
         }),
       ),
-      extensions: const [
+      extensions: [
         AppThemeExtension(
-          shimmerBase: Color(0xFF1A1A26),
-          shimmerHighlight: Color(0xFF2A2A40),
-          glassBackground: Color(0x801A1A26),
-          glassBorder: Color(0x402A2A40),
+          shimmerBase: oled ? const Color(0xFF080808) : const Color(0xFF1A1A26),
+          shimmerHighlight: oled ? const Color(0xFF151515) : const Color(0xFF2A2A40),
+          glassBackground: oled ? const Color(0xCC050505) : const Color(0x801A1A26),
+          glassBorder: oled ? const Color(0x50252525) : const Color(0x402A2A40),
           tagColors: {
-            'general': Color(0xFF7C8FFF),
-            'artist': Color(0xFFFF7CA0),
-            'copyright': Color(0xFFCC7CFF),
-            'character': Color(0xFF7CFFCC),
-            'meta': Color(0xFFFFCC7C),
+            'general': const Color(0xFF7C8FFF),
+            'artist': const Color(0xFFFF7CA0),
+            'copyright': const Color(0xFFCC7CFF),
+            'character': const Color(0xFF7CFFCC),
+            'meta': const Color(0xFFFFCC7C),
           },
         ),
       ],
     );
   }
 
-  static ThemeData get lightTheme {
+  static ThemeData _lightTheme(
+    Color accent,
+    Color accentLight,
+    Color accentDark,
+    Color accentContainer,
+  ) {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       scaffoldBackgroundColor: AppColors.lightBackground,
-      colorScheme: const ColorScheme.light(
-        primary: AppColors.primary,
+      colorScheme: ColorScheme.light(
+        primary: accent,
         onPrimary: Colors.white,
-        primaryContainer: Color(0xFFEEEBFF),
-        onPrimaryContainer: AppColors.primaryDark,
+        primaryContainer: accentContainer,
+        onPrimaryContainer: accentDark,
         secondary: AppColors.secondary,
         surface: AppColors.lightSurface,
         onSurface: AppColors.lightTextPrimary,
@@ -327,6 +365,21 @@ class AppTheme {
         AppColors.lightTextPrimary,
         AppColors.lightTextSecondary,
       ),
+      extensions: [
+        AppThemeExtension(
+          shimmerBase: const Color(0xFFE8E8F0),
+          shimmerHighlight: const Color(0xFFF5F5FA),
+          glassBackground: const Color(0x80FFFFFF),
+          glassBorder: const Color(0x40E0E0F0),
+          tagColors: {
+            'general': const Color(0xFF5C6FDF),
+            'artist': const Color(0xFFDF5C80),
+            'copyright': const Color(0xFFAC5CDF),
+            'character': const Color(0xFF5CDFAC),
+            'meta': const Color(0xFFDFAC5C),
+          },
+        ),
+      ],
     );
   }
 
