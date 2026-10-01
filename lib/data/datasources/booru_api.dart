@@ -46,7 +46,10 @@ class Rule34xxxDataSource implements BooruDataSource {
         's': 'post',
         'q': 'index',
         'tags': tags,
-        'limit': query.limit,
+        // Rule34's DAPI does not document a file-type meta-tag. When the
+        // user filters by media type, fetch the maximum page and filter by
+        // the actual file URL locally so GIF/video/image filters are real.
+        'limit': query.fileTypeFilter?.isNotEmpty == true ? 1000 : query.limit,
         'pid': query.page,
         'json': 1,
       };
@@ -58,7 +61,12 @@ class Rule34xxxDataSource implements BooruDataSource {
 
       final response = await _dio.get('/index.php', queryParameters: params);
 
-      return _extractPostRows(response.data).map(_parsePost).toList();
+      final posts = _extractPostRows(response.data).map(_parsePost).toList();
+      if (query.fileTypeFilter == null || query.fileTypeFilter!.isEmpty) {
+        return posts;
+      }
+      final wanted = query.fileTypeFilter!.toSet();
+      return posts.where((post) => wanted.contains(post.fileType)).toList();
     } catch (e) {
       AppLogger.error('Rule34xxx search error', e);
       rethrow;
@@ -463,7 +471,10 @@ class GelbooruDataSource implements BooruDataSource {
         's': 'post',
         'q': 'index',
         'tags': tags,
-        'limit': query.limit,
+        // Rule34's DAPI does not document a file-type meta-tag. When the
+        // user filters by media type, fetch the maximum page and filter by
+        // the actual file URL locally so GIF/video/image filters are real.
+        'limit': query.fileTypeFilter?.isNotEmpty == true ? 1000 : query.limit,
         'pid': query.page,
         'json': 1,
       };

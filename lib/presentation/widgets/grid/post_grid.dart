@@ -852,7 +852,11 @@ class _ThumbnailImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final url = post.thumbnailUrl ?? post.previewUrl ?? post.sampleUrl ?? post.fileUrl;
+    // Rule34's preview_url for GIFs is commonly a static JPEG. Use the real
+    // GIF file so Flutter's image codec can animate it in the grid.
+    final url = post.isGif
+        ? (post.fileUrl ?? post.sampleUrl ?? post.thumbnailUrl ?? post.previewUrl)
+        : (post.thumbnailUrl ?? post.previewUrl ?? post.sampleUrl ?? post.fileUrl);
 
     if (url == null || url.isEmpty) {
       return Container(

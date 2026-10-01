@@ -195,6 +195,10 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
   final LocalRepository _localRepo;
   Timer? _suggestionTimer;
   int _searchGeneration = 0;
+  // A small look-ahead cache keeps the next pages ready without hammering
+  // providers. It stores API metadata/posts, not the media files themselves.
+  final Map<String, List<Post>> _prefetchedPages = {};
+  final Set<String> _prefetchInFlight = {};
 
   SearchBloc({
     required SearchRepository searchRepo,
@@ -233,6 +237,8 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     Emitter<SearchState> emit,
   ) async {
     final requestGeneration = ++_searchGeneration;
+    _prefetchedPages.clear();
+    _prefetchInFlight.clear();
     emit(state.copyWith(
       status: SearchStatus.loading,
       tagString: event.tagString,
@@ -287,6 +293,12 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
         sourceErrors: sourceErrors,
       ));
 
+      // Warm two pages ahead in the background. This is deliberately modest:
+      // Rule34's terms ask clients not to hammer the API, and its public docs
+      // document a 1000-post request cap rather than a guaranteed 60 req/s
+      // allowance.
+      unawaited(_prefetchPages(query, requestGeneration, pagesAhead: 2));
+
       final tagParts = query.tags;
       if (tagParts.length == 1) {
         final counts = await _searchRepo.getTagCounts(
@@ -332,9 +344,14 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       };
 
       final results = await Future.wait(sourcesToLoad.map((source) async {
+        final page = nextPageBySource[source]!;
+        final key = _prefetchKey(baseQuery, source, page);
+        final cached = _prefetchedPages.remove(key);
+        if (cached != null) return MapEntry(source, cached);
+
         final query = baseQuery.copyWith(
           sources: [source],
-          page: nextPageBySource[source],
+          page: page,
         );
         final posts = await _searchRepo.sourceFor(source).search(query);
         return MapEntry(source, posts);
@@ -362,12 +379,48 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
         pageBySource: updatedPageBySource,
         hasMoreBySource: updatedHasMoreBySource,
       ));
+
+      unawaited(_prefetchPages(baseQuery, requestedGeneration, pagesAhead: 2));
     } catch (e) {
       if (emit.isDone || requestedGeneration != _searchGeneration) return;
       emit(state.copyWith(
         status: SearchStatus.failure,
         errorMessage: 'Failed to load more posts.',
       ));
+    }
+  }
+
+  String _prefetchKey(SearchQuery query, BooruSource source, int page) =>
+      '${source.name}|${page}|${query.tagString}|${query.ratingFilter}|${query.minScore}|${query.fileTypeFilter}';
+
+  Future<void> _prefetchPages(
+    SearchQuery baseQuery,
+    int generation, {
+    int pagesAhead = 2,
+  }) async {
+    if (generation != _searchGeneration) return;
+
+    for (final source in baseQuery.sources) {
+      for (var offset = 1; offset <= pagesAhead; offset++) {
+        if (generation != _searchGeneration) return;
+        final page = (state.pageBySource[source] ?? 0) + offset;
+        final key = _prefetchKey(baseQuery, source, page);
+        if (_prefetchedPages.containsKey(key) || _prefetchInFlight.contains(key)) continue;
+
+        // Keep provider pressure low: fetch one background page at a time.
+        _prefetchInFlight.add(key);
+        try {
+          final query = baseQuery.copyWith(sources: [source], page: page);
+          final posts = await _searchRepo.sourceFor(source).search(query);
+          if (generation == _searchGeneration) {
+            _prefetchedPages[key] = posts;
+          }
+        } catch (_) {
+          // Prefetch is an optimization. Normal pagination will retry.
+        } finally {
+          _prefetchInFlight.remove(key);
+        }
+      }
     }
   }
 
@@ -381,6 +434,8 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
 
   void _onSearchCleared(SearchCleared event, Emitter<SearchState> emit) {
     _searchGeneration++;
+    _prefetchedPages.clear();
+    _prefetchInFlight.clear();
     // Keep the user's chosen sources and filters, but remove stale results so
     // clearing the query returns Search to its clean, empty state.
     emit(SearchState(
@@ -489,9 +544,18 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
   ) {
     emit(state.copyWith(
       ratingFilter: event.ratingFilter,
+      clearRatingFilter: event.ratingFilter == null,
       minScore: event.minScore,
+      clearMinScore: event.minScore == null,
       fileTypeFilter: event.fileTypeFilter,
+      clearFileTypeFilter: event.fileTypeFilter == null,
     ));
+
+    // Changing a filter must actually re-run the active search. Previously the
+    // sheet only changed BLoC state, leaving the old result set on screen.
+    if (state.tagString.trim().isNotEmpty) {
+      add(SearchSubmitted(state.tagString, state.activeSources));
+    }
   }
 
   Future<void> _onFavoriteToggled(
@@ -546,6 +610,8 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
   @override
   Future<void> close() {
     _suggestionTimer?.cancel();
+    _prefetchedPages.clear();
+    _prefetchInFlight.clear();
     return super.close();
   }
 }
