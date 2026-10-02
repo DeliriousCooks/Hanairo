@@ -5,11 +5,22 @@ import '../../domain/entities/post.dart';
 import '../../core/utils/logger.dart';
 import '../../core/tags/tag_translator.dart';
 
+class TagSuggestion {
+  final String name;
+  final int? count;
+
+  const TagSuggestion(this.name, {this.count});
+}
+
 abstract class BooruDataSource {
   BooruSource get source;
   Future<List<Post>> search(SearchQuery query);
   Future<Post?> getPost(String id);
   Future<List<String>> getTagSuggestions(String prefix);
+  Future<List<TagSuggestion>> getTagSuggestionsWithCounts(String prefix) async =>
+      (await getTagSuggestions(prefix))
+          .map((name) => TagSuggestion(name))
+          .toList();
   Future<int?> getTagCount(String tag);
   Future<bool> login(String username, String credential);
   Future<bool> addFavorite(String postId);
@@ -181,6 +192,65 @@ class Rule34xxxDataSource implements BooruDataSource {
     } catch (_) {
       return [];
     }
+  }
+
+  @override
+  Future<List<TagSuggestion>> getTagSuggestionsWithCounts(String prefix) async {
+    final normalized = canonicalizeTag(prefix);
+    if (normalized.length < 2) return [];
+
+    final merged = <String, TagSuggestion>{};
+
+    // The autocomplete endpoint is useful for ranking, but does not
+    // consistently expose counts. Pull a larger tag page as a fallback and
+    // use its count field when available. This avoids one network request per
+    // suggestion later in the UI.
+    try {
+      final response = await _dio.get(
+        'https://api.rule34.xxx/autocomplete.php',
+        queryParameters: {'q': normalized},
+        options: Options(headers: {'Referer': 'https://rule34.xxx/'}),
+      ).timeout(const Duration(seconds: 2));
+      final data = response.data;
+      if (data is List) {
+        for (final row in data) {
+          if (row is Map) {
+            final name = (row['value'] ?? row['name'] ?? row['label'] ?? '').toString();
+            if (name.isNotEmpty) merged.putIfAbsent(name, () => TagSuggestion(name));
+          } else if (row is String && row.isNotEmpty) {
+            merged.putIfAbsent(row, () => TagSuggestion(row));
+          }
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final response = await _dio.get('/index.php', queryParameters: {
+        'page': 'dapi',
+        's': 'tag',
+        'q': 'index',
+        'name_pattern': '$normalized%',
+        'limit': 100,
+        'json': 1,
+        'orderby': 'count',
+      }).timeout(const Duration(seconds: 3));
+      final data = response.data;
+      final rows = data is List
+          ? data
+          : (data is Map ? (data['tag'] as List<dynamic>? ?? const []) : const []);
+      for (final row in rows) {
+        if (row is Map) {
+          final name = (row['name'] ?? '').toString();
+          if (name.isEmpty) continue;
+          final count = _toInt(row['count']);
+          merged[name] = TagSuggestion(name, count: count);
+        }
+      }
+    } catch (_) {}
+
+    final values = merged.values.toList();
+    values.sort((a, b) => (b.count ?? -1).compareTo(a.count ?? -1));
+    return values.take(40).toList();
   }
 
   @override
@@ -409,6 +479,34 @@ class E621DataSource implements BooruDataSource {
   }
 
   @override
+  Future<List<TagSuggestion>> getTagSuggestionsWithCounts(String prefix) async {
+    final normalized = canonicalizeTag(prefix);
+    if (normalized.length < 2) return [];
+    try {
+      _setAuth();
+      final response = await _dio.get('/tags.json', queryParameters: {
+        'search[name_matches]': '$normalized*',
+        'search[fuzzy_name_matches]': normalized,
+        'search[order]': 'count',
+        'limit': 100,
+      }).timeout(const Duration(seconds: 3));
+      final data = response.data as List<dynamic>? ?? [];
+      final byName = <String, TagSuggestion>{};
+      for (final item in data) {
+        if (item is! Map) continue;
+        final name = (item['name'] ?? '').toString();
+        if (name.isEmpty) continue;
+        byName[name] = TagSuggestion(name, count: _toInt(item['post_count']));
+      }
+      final values = byName.values.toList();
+      values.sort((a, b) => (b.count ?? -1).compareTo(a.count ?? -1));
+      return values.take(40).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
   Future<int?> getTagCount(String tag) async {
     try {
       _setAuth();
@@ -599,6 +697,30 @@ class GelbooruDataSource implements BooruDataSource {
   }
 
   @override
+  Future<List<TagSuggestion>> getTagSuggestionsWithCounts(String prefix) async {
+    final normalized = canonicalizeTag(prefix);
+    if (normalized.length < 2) return [];
+    try {
+      final response = await _dio.get('/index.php', queryParameters: {
+        'page': 'dapi', 's': 'tag', 'q': 'index',
+        'name_pattern': '$normalized%', 'limit': 100,
+        'json': 1, 'orderby': 'count',
+      }).timeout(const Duration(seconds: 3));
+      final body = response.data;
+      final rows = body is Map ? (body['tag'] as List<dynamic>? ?? const []) : const [];
+      final values = <TagSuggestion>[];
+      for (final row in rows) {
+        if (row is Map) {
+          final name = (row['name'] ?? '').toString();
+          if (name.isNotEmpty) values.add(TagSuggestion(name, count: _toInt(row['count'])));
+        }
+      }
+      values.sort((a, b) => (b.count ?? -1).compareTo(a.count ?? -1));
+      return values.take(40).toList();
+    } catch (_) { return []; }
+  }
+
+  @override
   Future<int?> getTagCount(String tag) async {
     try {
       final params = <String, dynamic>{
@@ -747,6 +869,28 @@ class PahealDataSource implements BooruDataSource {
     } catch (e) {
       return [];
     }
+  }
+
+  @override
+  Future<List<TagSuggestion>> getTagSuggestionsWithCounts(String prefix) async {
+    final normalized = canonicalizeTag(prefix);
+    if (normalized.length < 2) return [];
+    try {
+      final response = await _dio.get('/api/danbooru/find_tags',
+          queryParameters: {'name': '$normalized%', 'limit': 100})
+          .timeout(const Duration(seconds: 3));
+      final xmlStr = response.data as String? ?? '';
+      if (xmlStr.isEmpty) return [];
+      final doc = XmlDocument.parse(xmlStr);
+      final values = <TagSuggestion>[];
+      for (final e in doc.findAllElements('tag')) {
+        final name = e.getAttribute('name') ?? '';
+        if (name.isNotEmpty) values.add(TagSuggestion(name,
+            count: int.tryParse(e.getAttribute('count') ?? '')));
+      }
+      values.sort((a, b) => (b.count ?? -1).compareTo(a.count ?? -1));
+      return values.take(40).toList();
+    } catch (_) { return []; }
   }
 
   @override

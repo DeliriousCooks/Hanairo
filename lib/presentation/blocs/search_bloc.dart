@@ -486,43 +486,64 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     }
 
     try {
-      // Ask every active source concurrently. Previously this deliberately used
-      // only the first source, which meant a broken/slow R34 autocomplete could
-      // leave the entire dropdown empty even when E621 had valid suggestions.
-      final suggestions = await _searchRepo.getTagSuggestions(
+      // Fetch names + counts together. The booru tag endpoints already return
+      // post counts, so this avoids the old N-suggestions × N-sites follow-up
+      // requests that made the numbers painfully slow.
+      final suggestionsBySource = await _searchRepo.getTagSuggestionsWithCounts(
         lastTag,
         state.activeSources,
       );
       if (emit.isDone || state.suggestionQuery != query) return;
 
-      final visibleSuggestions = suggestions.take(5).toList();
-      emit(state.copyWith(
-        tagSuggestions: visibleSuggestions,
-        clearTagSuggestionCounts: true,
-      ));
-
-      // Counts are deliberately loaded after the suggestions are painted so
-      // the dropdown is not blocked by count requests. Each suggestion gets
-      // an exact count for every active site, plus a combined total.
-      if (visibleSuggestions.isNotEmpty) {
-        final countsBySource = await _searchRepo.getTagCountsForTags(
-          visibleSuggestions,
-          state.activeSources,
-        );
-        if (emit.isDone || state.suggestionQuery != query) return;
-
-        final combined = <String, int>{};
-        for (final sourceCounts in countsBySource.values) {
-          for (final entry in sourceCounts.entries) {
-            combined.update(entry.key, (value) => value + entry.value,
-                ifAbsent: () => entry.value);
+      final merged = <String, Map<BooruSource, int>>{};
+      for (final entry in suggestionsBySource.entries) {
+        for (final suggestion in entry.value) {
+          if (suggestion.name.isEmpty) continue;
+          if (suggestion.count != null) {
+            merged.putIfAbsent(suggestion.name, () => {})[entry.key] = suggestion.count!;
+          } else {
+            merged.putIfAbsent(suggestion.name, () => {});
           }
         }
-        emit(state.copyWith(
-          tagSuggestionCounts: combined,
-          tagSuggestionCountsBySource: countsBySource,
-        ));
       }
+
+      // Prefer tags that actually start with the typed fragment, then rank by
+      // their combined site counts. This makes common tags visible without
+      // throwing away less-common tags just because one provider returned a
+      // different ordering.
+      final normalized = lastTag.toLowerCase();
+      final ordered = merged.keys.toList()
+        ..sort((a, b) {
+          final aStarts = a.toLowerCase().startsWith(normalized);
+          final bStarts = b.toLowerCase().startsWith(normalized);
+          if (aStarts != bStarts) return aStarts ? -1 : 1;
+          final ac = merged[a]!.values.fold<int>(0, (v, n) => v + n);
+          final bc = merged[b]!.values.fold<int>(0, (v, n) => v + n);
+          return bc.compareTo(ac);
+        });
+
+      final visibleSuggestions = ordered.take(8).toList();
+      final countsBySource = <BooruSource, Map<String, int>>{};
+      final combined = <String, int>{};
+      for (final source in state.activeSources) {
+        final sourceMap = <String, int>{};
+        for (final tag in visibleSuggestions) {
+          final count = merged[tag]?[source];
+          if (count != null) {
+            sourceMap[tag] = count;
+            combined[tag] = (combined[tag] ?? 0) + count;
+          }
+        }
+        countsBySource[source] = sourceMap;
+      }
+
+      // Paint suggestions immediately, with any counts that arrived in the
+      // same request. No per-suggestion count requests remain in the hot path.
+      emit(state.copyWith(
+        tagSuggestions: visibleSuggestions,
+        tagSuggestionCounts: combined,
+        tagSuggestionCountsBySource: countsBySource,
+      ));
     } catch (e) {
       if (!emit.isDone && state.suggestionQuery == query) {
         emit(state.copyWith(

@@ -780,7 +780,7 @@ class _SuggestionsDropdown extends StatelessWidget {
           ),
         ],
       ),
-      constraints: const BoxConstraints(maxHeight: 220),
+      constraints: const BoxConstraints(maxHeight: 300),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 4),
         shrinkWrap: true,

@@ -15,6 +15,7 @@ class SearchRepository {
   final Map<BooruSource, BooruDataSource> _sources;
   final Map<String, ({DateTime at, List<String> tags})> _suggestionCache = {};
   final Map<String, ({DateTime at, int count})> _tagCountCache = {};
+  final Map<String, ({DateTime at, List<TagSuggestion> suggestions})> _suggestionDetailCache = {};
 
   SearchRepository()
       : _sources = {
@@ -74,59 +75,55 @@ class SearchRepository {
     return merged;
   }
 
-  /// Get tag suggestions from all active sources
+  /// Get tag suggestions and their site-local counts from all active sources.
+  /// The source tag endpoints already return counts, so we do not make a
+  /// second request for every visible suggestion.
+  Future<Map<BooruSource, List<TagSuggestion>>> getTagSuggestionsWithCounts(
+    String prefix,
+    List<BooruSource> sources,
+  ) async {
+    final normalized = prefix.trim().toLowerCase();
+    if (normalized.length < 2 || sources.isEmpty) return {};
+
+    final now = DateTime.now();
+    final results = await Future.wait(sources.map((source) async {
+      final key = '${source.name}|$normalized';
+      final cached = _suggestionDetailCache[key];
+      if (cached != null && now.difference(cached.at) < const Duration(minutes: 10)) {
+        return MapEntry(source, cached.suggestions);
+      }
+
+      final ds = _sources[source];
+      if (ds == null) return MapEntry(source, const <TagSuggestion>[]);
+
+      try {
+        final suggestions = await ds
+            .getTagSuggestionsWithCounts(normalized)
+            .timeout(const Duration(seconds: 2), onTimeout: () => <TagSuggestion>[]);
+        _suggestionDetailCache[key] = (at: DateTime.now(), suggestions: suggestions);
+        return MapEntry(source, suggestions);
+      } catch (_) {
+        return MapEntry(source, const <TagSuggestion>[]);
+      }
+    }));
+
+    return Map.fromEntries(results);
+  }
+
+  /// Legacy name retained for callers that only need tag names.
   Future<List<String>> getTagSuggestions(
     String prefix,
     List<BooruSource> sources,
   ) async {
-    if (prefix.length < 2) return [];
-
-    final normalized = prefix.trim().toLowerCase();
+    final bySource = await getTagSuggestionsWithCounts(prefix, sources);
     final seen = <String>{};
     final merged = <String>[];
-
-    // Return cached suggestions immediately when possible. Cache keys include
-    // the enabled source set so switching sources never leaks stale results.
-    for (final source in sources) {
-      final key = '${source.name}|$normalized';
-      final cached = _suggestionCache[key];
-      if (cached != null && DateTime.now().difference(cached.at) < const Duration(minutes: 10)) {
-        for (final tag in cached.tags) {
-          if (seen.add(tag)) merged.add(tag);
-        }
+    for (final list in bySource.values) {
+      for (final item in list) {
+        if (seen.add(item.name)) merged.add(item.name);
       }
     }
-
-    // A cache hit is fast enough to use immediately. For misses, query every
-    // enabled source concurrently. This is important because one source can
-    // legitimately return no autocomplete data; it must not prevent another
-    // enabled source from supplying suggestions. Each request has its own
-    // timeout in the data source implementation.
-    if (merged.length >= 10) return merged.take(30).toList();
-
-    final futures = sources.map((source) async {
-      final ds = _sources[source];
-      if (ds == null) return <String>[];
-      final key = '${source.name}|$normalized';
-      final cached = _suggestionCache[key];
-      if (cached != null && DateTime.now().difference(cached.at) < const Duration(minutes: 10)) {
-        return cached.tags;
-      }
-      final list = await ds
-          .getTagSuggestions(normalized)
-          .timeout(const Duration(seconds: 5), onTimeout: () => <String>[])
-          .catchError((_) => <String>[]);
-      _suggestionCache[key] = (at: DateTime.now(), tags: list);
-      return list;
-    });
-
-    final results = await Future.wait(futures);
-    for (final list in results) {
-      for (final tag in list) {
-        if (seen.add(tag)) merged.add(tag);
-      }
-    }
-    return merged.take(30).toList();
+    return merged.take(40).toList();
   }
 
   /// Fetches each selected site's count for one exact tag. Counts are omitted
