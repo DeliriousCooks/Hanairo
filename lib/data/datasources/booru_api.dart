@@ -115,27 +115,33 @@ class Rule34xxxDataSource implements BooruDataSource {
 
   @override
   Future<List<String>> getTagSuggestions(String prefix) async {
+    // Rule34's normal tag-list DAPI does not provide the site's autocomplete
+    // behavior. The site's autocomplete service is exposed from the API host
+    // and returns {label, value, type} objects. Keep this request small and
+    // independent from post/tag-count requests so typing stays responsive.
     try {
       final params = <String, dynamic>{
-        'page': 'dapi',
-        's': 'tag',
-        'q': 'index',
-        'name_pattern': '${prefix.toLowerCase()}%',
-        'limit': 20,
-        'json': 1,
-        'order': 'count',
+        'q': prefix.toLowerCase(),
       };
       if (_userId != null && _apiKey != null) {
         params['user_id'] = _userId;
         params['api_key'] = _apiKey;
       }
-      final response = await _dio.get('/index.php', queryParameters: params);
 
-      if (response.data == null) return [];
-      final List<dynamic> data =
-          response.data is List ? response.data : [response.data];
-      return data.map((t) => t['name'] as String).toList();
-    } catch (e) {
+      final response = await _dio.get(
+        '/autocomplete.php',
+        queryParameters: params,
+      ).timeout(const Duration(seconds: 4));
+
+      final data = response.data;
+      if (data is! List) return [];
+
+      return data
+          .whereType<Map>()
+          .map((row) => (row['value'] ?? row['name'] ?? '').toString())
+          .where((tag) => tag.isNotEmpty)
+          .toList();
+    } catch (_) {
       return [];
     }
   }

@@ -245,6 +245,9 @@ class _ViewerImagePage extends StatefulWidget {
 
 class _ViewerImagePageState extends State<_ViewerImagePage> {
   int _urlIndex = 0;
+  ImageStream? _imageStream;
+  ImageStreamListener? _imageListener;
+  Size? _imageSize;
 
   List<String> get _urls => [
         widget.post.fileUrl,
@@ -255,8 +258,60 @@ class _ViewerImagePageState extends State<_ViewerImagePage> {
 
   void _tryNextUrl() {
     if (mounted && _urlIndex < _urls.length - 1) {
-      setState(() => _urlIndex++);
+      _removeImageListener();
+      setState(() {
+        _urlIndex++;
+        _imageSize = null;
+      });
+      _resolveImageSize();
     }
+  }
+
+  void _removeImageListener() {
+    if (_imageStream != null && _imageListener != null) {
+      _imageStream!.removeListener(_imageListener!);
+    }
+    _imageStream = null;
+    _imageListener = null;
+  }
+
+  void _resolveImageSize() {
+    final urls = _urls;
+    if (urls.isEmpty || _urlIndex >= urls.length) return;
+
+    final provider = CachedNetworkImageProvider(urls[_urlIndex]);
+    final stream = provider.resolve(const ImageConfiguration());
+    final listener = ImageStreamListener(
+      (info, _) {
+        if (!mounted) return;
+        final image = info.image;
+        setState(() {
+          _imageSize = Size(
+            image.width.toDouble(),
+            image.height.toDouble(),
+          );
+        });
+      },
+      onError: (_, __) {},
+    );
+
+    _imageStream = stream;
+    _imageListener = listener;
+    stream.addListener(listener);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _resolveImageSize();
+    });
+  }
+
+  @override
+  void dispose() {
+    _removeImageListener();
+    super.dispose();
   }
 
   @override
@@ -265,7 +320,58 @@ class _ViewerImagePageState extends State<_ViewerImagePage> {
     if (urls.isEmpty || _urlIndex >= urls.length) {
       return const _ViewerImageError();
     }
+
     final size = MediaQuery.sizeOf(context);
+    final imageSize = _imageSize;
+    final aspectRatio = imageSize == null || imageSize.height == 0
+        ? null
+        : imageSize.width / imageSize.height;
+
+    // Extremely tall/long images should not be shrunk into a tiny strip.
+    // Fit them to the screen width and let InteractiveViewer pan/zoom the
+    // full-resolution image instead of forcing the whole image into the
+    // viewport height.
+    final isExtremePortrait = aspectRatio != null && aspectRatio < 0.58;
+    final isExtremeLandscape = aspectRatio != null && aspectRatio > 2.4;
+
+    final provider = CachedNetworkImageProvider(urls[_urlIndex]);
+
+    if (isExtremePortrait || isExtremeLandscape) {
+      return ClipRect(
+        child: InteractiveViewer(
+          minScale: 1,
+          maxScale: 4,
+          boundaryMargin: const EdgeInsets.all(80),
+          constrained: false,
+          panEnabled: true,
+          scaleEnabled: true,
+          child: Center(
+            child: Image(
+              image: provider,
+              width: isExtremePortrait ? size.width : null,
+              height: isExtremeLandscape ? size.height : null,
+              fit: isExtremePortrait ? BoxFit.fitWidth : BoxFit.fitHeight,
+              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                if (frame != null || wasSynchronouslyLoaded) return child;
+                return const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF9D8BFF),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                WidgetsBinding.instance.addPostFrameCallback((_) => _tryNextUrl());
+                return const _ViewerImageError();
+              },
+            ),
+          ),
+        ),
+      );
+    }
+
     return InteractiveViewer(
       minScale: 1,
       maxScale: 4,

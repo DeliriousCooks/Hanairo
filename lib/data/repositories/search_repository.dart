@@ -97,8 +97,11 @@ class SearchRepository {
       }
     }
 
-    // A cache hit is fast enough to use immediately. For misses, fetch all
-    // sources concurrently; the BLoC also emits each source as it completes.
+    // A cache hit is fast enough to use immediately. For misses, query every
+    // enabled source concurrently. This is important because one source can
+    // legitimately return no autocomplete data; it must not prevent another
+    // enabled source from supplying suggestions. Each request has its own
+    // timeout in the data source implementation.
     if (merged.length >= 10) return merged.take(30).toList();
 
     final futures = sources.map((source) async {
@@ -109,7 +112,10 @@ class SearchRepository {
       if (cached != null && DateTime.now().difference(cached.at) < const Duration(minutes: 10)) {
         return cached.tags;
       }
-      final list = await ds.getTagSuggestions(normalized).catchError((_) => <String>[]);
+      final list = await ds
+          .getTagSuggestions(normalized)
+          .timeout(const Duration(seconds: 5), onTimeout: () => <String>[])
+          .catchError((_) => <String>[]);
       _suggestionCache[key] = (at: DateTime.now(), tags: list);
       return list;
     });
