@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/media_saver.dart';
+import '../../../core/utils/hardware_volume.dart';
 import '../../../domain/entities/post.dart';
 import '../../../data/repositories/local_repository.dart';
 import '../../blocs/search_bloc.dart';
@@ -323,14 +324,30 @@ class _VideoPlayerWidget extends StatefulWidget {
 
 class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
   VideoPlayerController? _vpController;
+  StreamSubscription<void>? _volumeSubscription;
   bool _initialized = false;
   bool _muted = true;
+  bool _showControls = true;
+  double? _scrubPositionMs;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _volumeSubscription = HardwareVolumeService.instance.onVolumeUp.listen((_) {
+      if (!mounted || !_muted || !widget.isActive) return;
+      final controller = _vpController;
+      if (controller == null || !controller.value.isInitialized) return;
+      unawaited(_unmuteFromHardwareButton(controller));
+    });
     unawaited(_initPlayer());
+  }
+
+  Future<void> _unmuteFromHardwareButton(VideoPlayerController controller) async {
+    try {
+      await controller.setVolume(1);
+      if (mounted) setState(() => _muted = false);
+    } catch (_) {}
   }
 
   @override
@@ -340,8 +357,6 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
     if (widget.isActive) {
       unawaited(_startPlayback());
     } else {
-      // Pause as soon as this page stops being the selected post. Also mute
-      // immediately so audio cannot leak while a retained page is settling.
       unawaited(_stopPlayback());
     }
   }
@@ -365,7 +380,7 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
       } else {
         await _stopPlayback();
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) setState(() => _error = 'Failed to load video');
     }
   }
@@ -378,19 +393,12 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
     }
     try {
       await controller.setVolume(_muted ? 0 : 1);
-      if (!mounted || !widget.isActive ||
-          !identical(_vpController, controller)) {
+      if (!mounted || !widget.isActive || !identical(_vpController, controller)) {
         await _stopPlayback();
         return;
       }
       await controller.play();
-      if (!mounted || !widget.isActive ||
-          !identical(_vpController, controller)) {
-        await _stopPlayback();
-      }
-    } catch (_) {
-      // A page can be disposed while the platform player is changing state.
-    }
+    } catch (_) {}
   }
 
   Future<void> _stopPlayback() async {
@@ -399,13 +407,40 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
     try {
       await controller.pause();
       await controller.setVolume(0);
-    } catch (_) {
-      // The player may still be initializing or already disposed.
-    }
+    } catch (_) {}
+  }
+
+  Future<void> _toggleMute() async {
+    final controller = _vpController;
+    if (controller == null) return;
+    final nextMuted = !_muted;
+    try {
+      await controller.setVolume(nextMuted ? 0 : 1);
+      if (mounted) setState(() => _muted = nextMuted);
+    } catch (_) {}
+  }
+
+  Future<void> _seekBy(Duration delta) async {
+    final controller = _vpController;
+    if (controller == null || !controller.value.isInitialized) return;
+    final duration = controller.value.duration;
+    final target = controller.value.position + delta;
+    final clamped = target < Duration.zero
+        ? Duration.zero
+        : (target > duration ? duration : target);
+    await controller.seekTo(clamped);
+  }
+
+  String _formatTime(Duration duration) {
+    final totalSeconds = duration.inSeconds;
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
   @override
   void dispose() {
+    _volumeSubscription?.cancel();
     _vpController?.dispose();
     super.dispose();
   }
@@ -420,10 +455,7 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
             const Icon(Icons.videocam_off_rounded,
                 size: 52, color: Colors.white30),
             const SizedBox(height: 12),
-            Text(
-              _error!,
-              style: const TextStyle(color: Colors.white38, fontSize: 13),
-            ),
+            Text(_error!, style: const TextStyle(color: Colors.white38, fontSize: 13)),
           ],
         ),
       );
@@ -436,81 +468,174 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
         ),
       );
     }
+
     return Center(
       child: AspectRatio(
         aspectRatio: _vpController!.value.aspectRatio,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            VideoPlayer(_vpController!),
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(14, 28, 14, 10),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [Color(0x99070A15), Colors.transparent],
-                  ),
-                ),
-                child: VideoProgressIndicator(
-                  _vpController!,
-                  allowScrubbing: true,
-                  colors: const VideoProgressColors(
-                    playedColor: Color(0xFF9D83FF),
-                    bufferedColor: Colors.white38,
-                    backgroundColor: Colors.white24,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 12,
-              right: 12,
-              child: Material(
-                color: Colors.black.withOpacity(0.64),
-                shape: const CircleBorder(),
-                child: IconButton(
-                  tooltip: _muted ? 'Unmute video' : 'Mute video',
-                  onPressed: () async {
-                    final nextMuted = !_muted;
-                    await _vpController!.setVolume(nextMuted ? 0 : 1);
-                    if (mounted) setState(() => _muted = nextMuted);
-                  },
-                  icon: Icon(
-                    _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                    color: Colors.white,
-                    size: 21,
-                  ),
-                ),
-              ),
-            ),
-            Align(
-              alignment: Alignment.center,
-              child: ValueListenableBuilder<VideoPlayerValue>(
-                valueListenable: _vpController!,
-                builder: (context, value, _) => Material(
-                  color: Colors.black.withOpacity(0.55),
-                  shape: const CircleBorder(),
-                  child: IconButton(
-                    tooltip: value.isPlaying ? 'Pause video' : 'Play video',
-                    onPressed: () => value.isPlaying
-                        ? _vpController!.pause()
-                        : _vpController!.play(),
-                    icon: Icon(
-                      value.isPlaying
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded,
-                      color: Colors.white,
-                      size: 32,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => setState(() => _showControls = !_showControls),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              VideoPlayer(_vpController!),
+              if (_showControls)
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.center,
+                        colors: [Color(0xB8070A15), Colors.transparent],
+                        stops: [0.0, 0.55],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-          ],
+              if (_showControls)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Material(
+                    color: Colors.black.withOpacity(0.68),
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      tooltip: _muted ? 'Unmute video' : 'Mute video',
+                      onPressed: _toggleMute,
+                      icon: Icon(
+                        _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                        color: Colors.white,
+                        size: 21,
+                      ),
+                    ),
+                  ),
+                ),
+              if (_showControls)
+                Align(
+                  alignment: Alignment.center,
+                  child: ValueListenableBuilder<VideoPlayerValue>(
+                    valueListenable: _vpController!,
+                    builder: (context, value, _) => Material(
+                      color: Colors.black.withOpacity(0.58),
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        tooltip: value.isPlaying ? 'Pause video' : 'Play video',
+                        iconSize: 34,
+                        padding: const EdgeInsets.all(12),
+                        onPressed: () => value.isPlaying
+                            ? _vpController!.pause()
+                            : _vpController!.play(),
+                        icon: Icon(
+                          value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (_showControls)
+                Positioned(
+                  left: 10,
+                  right: 10,
+                  bottom: 8,
+                  child: ValueListenableBuilder<VideoPlayerValue>(
+                    valueListenable: _vpController!,
+                    builder: (context, value, _) {
+                      final duration = value.duration;
+                      final maxMs = duration.inMilliseconds.toDouble();
+                      final positionMs = value.position.inMilliseconds
+                          .clamp(0, duration.inMilliseconds)
+                          .toDouble();
+                      final sliderMax = maxMs <= 0 ? 1.0 : maxMs;
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              _SeekButton(
+                                icon: Icons.replay_10_rounded,
+                                onPressed: () => _seekBy(const Duration(seconds: -10)),
+                              ),
+                              Expanded(
+                                child: SliderTheme(
+                                  data: SliderTheme.of(context).copyWith(
+                                    trackHeight: 5,
+                                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+                                    activeTrackColor: AppColors.primary,
+                                    inactiveTrackColor: Colors.white30,
+                                    thumbColor: Colors.white,
+                                    overlayColor: AppColors.primary.withOpacity(0.22),
+                                  ),
+                                  child: Slider(
+                                    min: 0,
+                                    max: sliderMax,
+                                    value: (_scrubPositionMs ?? positionMs).clamp(0, sliderMax),
+                                    onChanged: maxMs <= 0
+                                        ? null
+                                        : (value) => setState(() => _scrubPositionMs = value),
+                                    onChangeEnd: maxMs <= 0
+                                        ? null
+                                        : (value) async {
+                                            await _vpController!.seekTo(
+                                              Duration(milliseconds: value.round()),
+                                            );
+                                            if (mounted) setState(() => _scrubPositionMs = null);
+                                          },
+                                  ),
+                                ),
+                              ),
+                              _SeekButton(
+                                icon: Icons.forward_10_rounded,
+                                onPressed: () => _seekBy(const Duration(seconds: 10)),
+                              ),
+                            ],
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  _formatTime(value.position),
+                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontFeatures: [FontFeature.tabularFigures()]),
+                                ),
+                                Text(
+                                  _formatTime(duration),
+                                  style: const TextStyle(color: Colors.white70, fontSize: 11, fontFeatures: [FontFeature.tabularFigures()]),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _SeekButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+  const _SeekButton({required this.icon, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withOpacity(0.58),
+      shape: const CircleBorder(),
+      child: IconButton(
+        onPressed: onPressed,
+        tooltip: icon == Icons.replay_10_rounded ? 'Back 10 seconds' : 'Forward 10 seconds',
+        padding: const EdgeInsets.all(7),
+        constraints: const BoxConstraints(minWidth: 42, minHeight: 42),
+        icon: Icon(icon, color: Colors.white, size: 23),
       ),
     );
   }

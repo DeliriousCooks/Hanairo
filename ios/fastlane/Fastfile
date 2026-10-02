@@ -5,7 +5,7 @@ default_platform(:ios)
 
 platform :ios do
 
-  desc "Build a signed Ad Hoc IPA using imported P12 and provisioning profile"
+  desc "Build a signed development IPA using imported P12 and provisioning profile"
   lane :build_adhoc do
 
     # ── 1. Import the distribution certificate from the P12 ──────────────────
@@ -25,10 +25,10 @@ platform :ios do
     update_code_signing_settings(
       use_automatic_signing: false,
       path:                  "ios/Runner.xcodeproj",
-      bundle_identifier:     "app.starfruit8199.snowleopard5722",
-      team_id:               "SE4UL3VJW5",
-      profile_uuid:          "e52b0627-df22-4cd5-b59f-a1224fad20ed",
-      code_sign_identity:    "iPhone Distribution: qa ba (SE4UL3VJW5)"
+      bundle_identifier:     "app.polarbear5166.durian2960",
+      team_id:               "LKRRVC93D7",
+      profile_uuid:          "de77d7a9-90e4-4b61-91ab-032ee2236adf",
+      code_sign_identity:    ENV["CODE_SIGN_IDENTITY"] || "Apple Development"
     )
 
     # ── 4. Build Flutter ──────────────────────────────────────────────────────
@@ -39,23 +39,23 @@ platform :ios do
       scheme:                  "Runner",
       workspace:               "ios/Runner.xcworkspace",
       configuration:           "Release",
-      export_method:           "ad-hoc",
+      export_method:           "development",
       export_options:          {
-        method:               "ad-hoc",
-        teamID:               "SE4UL3VJW5",
+        method:               "development",
+        teamID:               "LKRRVC93D7",
         signingStyle:         "manual",
-        signingCertificate:   "iPhone Distribution: qa ba (SE4UL3VJW5)",
+        signingCertificate:   ENV["CODE_SIGN_IDENTITY"] || "Apple Development",
         provisioningProfiles: {
-          "app.starfruit8199.snowleopard5722" => "e52b0627-df22-4cd5-b59f-a1224fad20ed"
+          "app.polarbear5166.durian2960" => "de77d7a9-90e4-4b61-91ab-032ee2236adf"
         }
       },
       output_directory:        "build/ios/ipa",
-      output_name:             "BooruGallery_AdHoc.ipa",
+      output_name:             "BooruGallery_Development.ipa",
       clean:                   false,
       skip_package_dependencies_resolution: false
     )
 
-    UI.success "✅ IPA built: build/ios/ipa/BooruGallery_AdHoc.ipa"
+    UI.success "✅ IPA built: build/ios/ipa/BooruGallery_Development.ipa"
   end
 
 end

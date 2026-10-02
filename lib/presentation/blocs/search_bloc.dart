@@ -77,7 +77,7 @@ class SearchState extends Equatable {
   final String? errorMessage;
   final List<String> tagSuggestions;
   final Map<String, int> tagSuggestionCounts;
-  final Map<BooruSource, int> tagCounts;
+  final Map<BooruSource, Map<String, int>> tagCountsBySource;
 
   const SearchState({
     this.status = SearchStatus.initial,
@@ -95,7 +95,7 @@ class SearchState extends Equatable {
     this.errorMessage,
     this.tagSuggestions = const [],
     this.tagSuggestionCounts = const {},
-    this.tagCounts = const {},
+    this.tagCountsBySource = const {},
   });
 
   /// True if at least one active source might still have more results to
@@ -127,7 +127,7 @@ class SearchState extends Equatable {
     List<String>? tagSuggestions,
     Map<String, int>? tagSuggestionCounts,
     bool clearTagSuggestionCounts = false,
-    Map<BooruSource, int>? tagCounts,
+    Map<BooruSource, Map<String, int>>? tagCountsBySource,
     bool clearTagCounts = false,
   }) {
     return SearchState(
@@ -148,7 +148,7 @@ class SearchState extends Equatable {
       tagSuggestionCounts: clearTagSuggestionCounts
           ? const {}
           : (tagSuggestionCounts ?? this.tagSuggestionCounts),
-      tagCounts: clearTagCounts ? const {} : (tagCounts ?? this.tagCounts),
+      tagCountsBySource: clearTagCounts ? const {} : (tagCountsBySource ?? this.tagCountsBySource),
     );
   }
 
@@ -184,7 +184,7 @@ class SearchState extends Equatable {
         errorMessage,
         tagSuggestions,
         tagSuggestionCounts,
-        tagCounts,
+        tagCountsBySource,
       ];
 }
 
@@ -300,16 +300,20 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       unawaited(_prefetchPages(query, requestGeneration, pagesAhead: 2));
 
       final tagParts = query.tags;
-      if (tagParts.length == 1) {
-        final counts = await _searchRepo.getTagCounts(
-          tagParts.single,
-          query.sources,
-        );
-        if (!emit.isDone &&
-            requestGeneration == _searchGeneration &&
-            state.tagString == event.tagString) {
-          emit(state.copyWith(tagCounts: counts));
-        }
+      // Counts never block the first result set. They load in the background
+      // and are cached by the repository for fast repeat searches.
+      if (tagParts.isNotEmpty) {
+        unawaited(() async {
+          final counts = await _searchRepo.getTagCountsForTags(
+            tagParts,
+            query.sources,
+          );
+          if (!emit.isDone &&
+              requestGeneration == _searchGeneration &&
+              state.tagString == event.tagString) {
+            emit(state.copyWith(tagCountsBySource: counts));
+          }
+        }());
       }
     } catch (e) {
       if (emit.isDone || requestGeneration != _searchGeneration) return;
@@ -477,7 +481,9 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     try {
       final suggestions = await _searchRepo.getTagSuggestions(
         lastTag,
-        state.activeSources,
+        state.activeSources.length > 1
+            ? state.activeSources.take(1).toList()
+            : state.activeSources,
       );
       if (emit.isDone || state.suggestionQuery != query) return;
       emit(state.copyWith(
@@ -485,30 +491,11 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
         clearTagSuggestionCounts: true,
       ));
 
-      // Counts come from each enabled booru so the suggestions stay useful
-      // when users search across more than one source. Keep this to the first
-      // five suggestions to avoid firing an unbounded number of API calls.
-      final countResults = await Future.wait(
-        suggestions.take(5).map((tag) async {
-          try {
-            final perSource = await _searchRepo.getTagCounts(
-              tag,
-              state.activeSources,
-            );
-            final total =
-                perSource.values.fold<int>(0, (sum, count) => sum + count);
-            return total > 0 ? MapEntry(tag, total) : null;
-          } catch (_) {
-            return null;
-          }
-        }),
-      );
+      // Do not fetch count endpoints while the user is typing. Those extra
+      // requests were the main source of autocomplete lag. Counts for the
+      // submitted search are loaded separately after the first results appear.
       if (!emit.isDone && state.suggestionQuery == query) {
-        emit(state.copyWith(
-          tagSuggestionCounts: Map.fromEntries(
-            countResults.whereType<MapEntry<String, int>>(),
-          ),
-        ));
+        emit(state.copyWith(clearTagSuggestionCounts: true));
       }
     } catch (e) {
       if (!emit.isDone && state.suggestionQuery == query) {

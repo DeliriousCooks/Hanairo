@@ -95,3 +95,7 @@ Rule34 currently requires API credentials for API search requests. Gelbooru may 
 
 
 
+
+## iOS Bundle ID
+
+BooruBot uses `app.starfruit8199.boorubot` as its iOS Bundle ID. The provisioning profile used for signing must authorize this exact App ID; the CI workflow validates this instead of silently adopting the profile's old identifier.

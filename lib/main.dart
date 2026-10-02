@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/theme/theme_settings.dart';
+import 'core/utils/hardware_volume.dart';
 import 'data/repositories/search_repository.dart';
 import 'data/repositories/local_repository.dart';
 import 'presentation/blocs/search_bloc.dart';
@@ -25,6 +26,7 @@ late final ThemeController _themeController;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  HardwareVolumeService.instance.init();
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,

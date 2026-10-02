@@ -951,16 +951,26 @@ class _ResultsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final countSummary = state.tagCounts.entries
-        .map((entry) => '${entry.key.shortName} ${_formatTagCount(entry.value)}')
-        .join('  ·  ');
-    final combinedTagCount = state.tagCounts.values.fold<int>(0, (sum, count) => sum + count);
+    final counts = state.tagCountsBySource;
+    final tags = state.tagString
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((t) => t.isNotEmpty)
+        .toList();
+    final combinedByTag = <String, int>{};
+    for (final sourceCounts in counts.values) {
+      for (final entry in sourceCounts.entries) {
+        combinedByTag[entry.key] = (combinedByTag[entry.key] ?? 0) + entry.value;
+      }
+    }
+
     final authSources = state.failedSources
         .where((source) => _sourceNeedsCredentials(
               source,
               state.sourceErrors[source],
             ))
         .toList();
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
       child: Column(
@@ -968,162 +978,111 @@ class _ResultsHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.6),
-                  borderRadius: BorderRadius.circular(8),
-                ),
+              Expanded(
                 child: Text(
-                  '${state.posts.length} results loaded',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
+                  state.tagString,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-              if (state.tagString.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: state.tagString,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: theme.colorScheme.primary.withOpacity(0.9),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          if (state.tagCounts.isNotEmpty)
-                            TextSpan(
-                              text: '  ${_formatTagCount(combinedTagCount)}',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                        ],
+              if (tags.length == 1)
+                ValueListenableBuilder<int>(
+                  valueListenable:
+                      context.read<LocalRepository>().favoriteTagsRevision,
+                  builder: (context, _, __) {
+                    final local = context.read<LocalRepository>();
+                    final saved = local.isFavoriteTag(state.tagString);
+                    return IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: saved ? 'Remove saved tag' : 'Save this tag',
+                      onPressed: () => local.toggleFavoriteTag(state.tagString),
+                      icon: Icon(
+                        saved
+                            ? Icons.bookmark_rounded
+                            : Icons.bookmark_border_rounded,
+                        size: 18,
+                        color: saved
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
-                    ),
-                  ),
+                    );
+                  },
                 ),
-                if (state.tagString.trim().split(RegExp(r'\s+')).length == 1)
-                  ValueListenableBuilder<int>(
-                    valueListenable: context
-                        .read<LocalRepository>()
-                        .favoriteTagsRevision,
-                    builder: (context, _, __) {
-                      final local = context.read<LocalRepository>();
-                      final saved = local.isFavoriteTag(state.tagString);
-                      return IconButton(
-                        visualDensity: VisualDensity.compact,
-                        tooltip: saved ? 'Remove saved tag' : 'Save this tag',
-                        onPressed: () => local.toggleFavoriteTag(state.tagString),
-                        icon: Icon(
-                          saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                          size: 18,
-                          color: saved
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurfaceVariant,
-                        ),
-                      );
-                    },
-                  ),
-              ],
             ],
           ),
-          if (state.tagCounts.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 7),
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'Across enabled sites  ·  ',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.78),
-                      ),
-                    ),
-                    TextSpan(
-                      text: '${_formatTagCount(combinedTagCount)} total',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurface,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    TextSpan(
-                      text: '  ·  $countSummary',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.78),
-                      ),
-                    ),
-                  ],
-                ),
+          if (counts.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Tag totals',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
               ),
             ),
+            const SizedBox(height: 4),
+            ...tags.map((tag) {
+              final sourceParts = <String>[];
+              for (final source in state.activeSources) {
+                final value = counts[source]?[tag];
+                if (value != null) {
+                  sourceParts.add('${source.shortName} ${_formatTagCount(value)}');
+                }
+              }
+              final combined = combinedByTag[tag];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Text(
+                  '$tag  ·  ${sourceParts.join('  ·  ')}'
+                  '${combined != null ? '  ·  All sites ${_formatTagCount(combined)}' : ''}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              );
+            }),
+            if (tags.length > 1)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  'Counts above are per-tag totals; they are not the intersection count for all tags together.',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.65),
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+          ],
           if (state.failedSources.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: AppColors.warning.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
-                  border:
-                      Border.all(color: AppColors.warning.withOpacity(0.3)),
+                  border: Border.all(color: AppColors.warning.withOpacity(0.3)),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.error_outline_rounded,
-                            size: 14, color: AppColors.warning),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            authSources.isNotEmpty
-                                ? '${authSources.map((s) => s.shortName).join(', ')} needs API credentials — results may be incomplete.'
-                                : '${state.failedSources.map((s) => s.shortName).join(', ')} unavailable — results may be incomplete.',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
+                    const Icon(Icons.error_outline_rounded,
+                        size: 14, color: AppColors.warning),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        authSources.isNotEmpty
+                            ? '${authSources.map((s) => s.shortName).join(', ')} needs API credentials — results may be incomplete.'
+                            : '${state.failedSources.map((s) => s.shortName).join(', ')} unavailable — results may be incomplete.',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurface,
                         ),
-                      ],
-                    ),
-                    if (authSources.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: authSources
-                            .map((source) => TextButton.icon(
-                                  style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  onPressed: () => context.push(
-                                    '/auth/${source.name}',
-                                  ),
-                                  icon: const Icon(Icons.key_rounded, size: 14),
-                                  label: Text('Connect ${source.shortName}'),
-                                ))
-                            .toList(),
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),

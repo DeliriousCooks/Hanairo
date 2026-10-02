@@ -13,6 +13,8 @@ class SourceResult {
 
 class SearchRepository {
   final Map<BooruSource, BooruDataSource> _sources;
+  final Map<String, ({DateTime at, List<String> tags})> _suggestionCache = {};
+  final Map<String, ({DateTime at, int count})> _tagCountCache = {};
 
   SearchRepository()
       : _sources = {
@@ -79,24 +81,45 @@ class SearchRepository {
   ) async {
     if (prefix.length < 2) return [];
 
-    final futures = sources.map((source) {
-      final ds = _sources[source];
-      if (ds == null) return Future.value(<String>[]);
-      return ds.getTagSuggestions(prefix).catchError((_) => <String>[]);
-    });
-
-    final results = await Future.wait(futures);
+    final normalized = prefix.trim().toLowerCase();
     final seen = <String>{};
     final merged = <String>[];
 
-    for (final list in results) {
-      for (final tag in list) {
-        if (seen.add(tag)) {
-          merged.add(tag);
+    // Return cached suggestions immediately when possible. Cache keys include
+    // the enabled source set so switching sources never leaks stale results.
+    for (final source in sources) {
+      final key = '${source.name}|$normalized';
+      final cached = _suggestionCache[key];
+      if (cached != null && DateTime.now().difference(cached.at) < const Duration(minutes: 10)) {
+        for (final tag in cached.tags) {
+          if (seen.add(tag)) merged.add(tag);
         }
       }
     }
 
+    // A cache hit is fast enough to use immediately. For misses, fetch all
+    // sources concurrently; the BLoC also emits each source as it completes.
+    if (merged.length >= 10) return merged.take(30).toList();
+
+    final futures = sources.map((source) async {
+      final ds = _sources[source];
+      if (ds == null) return <String>[];
+      final key = '${source.name}|$normalized';
+      final cached = _suggestionCache[key];
+      if (cached != null && DateTime.now().difference(cached.at) < const Duration(minutes: 10)) {
+        return cached.tags;
+      }
+      final list = await ds.getTagSuggestions(normalized).catchError((_) => <String>[]);
+      _suggestionCache[key] = (at: DateTime.now(), tags: list);
+      return list;
+    });
+
+    final results = await Future.wait(futures);
+    for (final list in results) {
+      for (final tag in list) {
+        if (seen.add(tag)) merged.add(tag);
+      }
+    }
     return merged.take(30).toList();
   }
 
@@ -115,6 +138,41 @@ class SearchRepository {
       return count == null ? null : MapEntry(source, count);
     }));
     return Map.fromEntries(results.whereType<MapEntry<BooruSource, int>>());
+  }
+
+  /// Counts each requested tag on every enabled source. These are independent
+  /// tag totals (not the intersection count for a multi-tag search).
+  Future<Map<BooruSource, Map<String, int>>> getTagCountsForTags(
+    List<String> tags,
+    List<BooruSource> sources,
+  ) async {
+    final cleanTags = tags.map((t) => t.trim()).where((t) => t.isNotEmpty).toSet().toList();
+    if (cleanTags.isEmpty || sources.isEmpty) return {};
+
+    final entries = await Future.wait(sources.map((source) async {
+      final counts = <String, int>{};
+      await Future.wait(cleanTags.map((tag) async {
+        final translated = TagTranslator.translate([tag], source);
+        if (translated.isEmpty) return;
+        final canonical = translated.single;
+        final key = '${source.name}|$canonical';
+        final cached = _tagCountCache[key];
+        if (cached != null && DateTime.now().difference(cached.at) < const Duration(minutes: 10)) {
+          counts[tag] = cached.count;
+          return;
+        }
+        final count = await _sources[source]
+            ?.getTagCount(canonical)
+            .timeout(const Duration(seconds: 5), onTimeout: () => null);
+        if (count != null) {
+          _tagCountCache[key] = (at: DateTime.now(), count: count);
+          counts[tag] = count;
+        }
+      }));
+      return MapEntry(source, counts);
+    }));
+
+    return Map.fromEntries(entries);
   }
 
   Future<bool> login(BooruSource source, String username, String credential) {

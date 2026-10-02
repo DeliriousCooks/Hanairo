@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace "app.starfruit8199.snowleopard5722"
+    namespace "app.starfruit8199.boorubot"
     compileSdk flutter.compileSdkVersion
     ndkVersion flutter.ndkVersion
 
@@ -19,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "app.starfruit8199.snowleopard5722"
+        applicationId "app.starfruit8199.boorubot"
         minSdkVersion 21
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutter.versionCode
