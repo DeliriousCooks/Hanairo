@@ -33,12 +33,11 @@ jobs:
       - name: Ensure iOS platform files exist
         run: |
           if [ ! -f "ios/Runner.xcodeproj/project.pbxproj" ]; then
-            echo "ios/Runner.xcodeproj is missing from the repo — regenerating iOS platform files with 'flutter create'."
-            echo "This will NOT overwrite files that already exist (like your customized Info.plist)."
             flutter create --platforms=ios --project-name booru_aggregator --org app.starfruit8199 .
           fi
+
           if [ ! -f "ios/Runner.xcodeproj/project.pbxproj" ]; then
-            echo "::error::ios/Runner.xcodeproj/project.pbxproj still missing after 'flutter create'. Aborting."
+            echo "::error::ios/Runner.xcodeproj/project.pbxproj is missing."
             exit 1
           fi
 
@@ -62,10 +61,6 @@ jobs:
 
       - name: Import P12 certificate
         run: |
-          echo "P12 size: $(wc -c < /tmp/cert.p12) bytes"
-
-          # Step 1: extract cert + key to unencrypted PEM
-          # try -legacy first (for older P12 formats), fall back to default
           if ! openssl pkcs12 \
               -in /tmp/cert.p12 \
               -passin pass:${{ secrets.P12_PASSWORD }} \
@@ -76,9 +71,6 @@ jobs:
               -nodes -out /tmp/cert_and_key.pem
           fi
 
-          echo "PEM size: $(wc -c < /tmp/cert_and_key.pem) bytes"
-
-          # Step 2: re-pack into a fresh P12 with a known-safe password
           openssl pkcs12 \
             -in /tmp/cert_and_key.pem \
             -passin pass: \
@@ -86,9 +78,6 @@ jobs:
             -passout pass:TempCert999 \
             -out /tmp/cert_final.p12
 
-          echo "Final P12 size: $(wc -c < /tmp/cert_final.p12) bytes"
-
-          # Step 3: import into keychain
           security import /tmp/cert_final.p12 \
             -k "$KEYCHAIN_NAME" \
             -P "TempCert999" \
@@ -101,18 +90,17 @@ jobs:
             -s -k "$KEYCHAIN_PASSWORD" \
             "$KEYCHAIN_NAME"
 
-          # Should show: iPhone Distribution: qa ba (SE4UL3VJW5)
           security find-identity -v -p codesigning "$KEYCHAIN_NAME"
 
-          # Extract the identity string (between quotes on the first match) instead of
-          # hardcoding it, since it depends on whichever cert is in the P12 secret.
           IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_NAME" \
             | head -1 \
             | sed -E 's/^[[:space:]]*[0-9]+\)[[:space:]]+[0-9A-F]+[[:space:]]+"(.*)"$/\1/')
+
           if [ -z "$IDENTITY" ]; then
-            echo "::error::Could not find a valid codesigning identity in the keychain after import."
+            echo "::error::Could not find a valid codesigning identity."
             exit 1
           fi
+
           echo "Codesign identity: $IDENTITY"
           echo "CODE_SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
 
@@ -120,27 +108,27 @@ jobs:
         run: |
           PP_UUID=$(security cms -D -i /tmp/profile.mobileprovision | plutil -extract UUID raw -o - -)
           TEAM_ID=$(security cms -D -i /tmp/profile.mobileprovision | plutil -extract TeamIdentifier.0 raw -o - -)
-          BUNDLE_ID_RAW=$(security cms -D -i /tmp/profile.mobileprovision | plutil -extract Entitlements.application-identifier raw -o - -)
-          # application-identifier is "TEAMID.bundle.id" - strip the "TEAMID." prefix
-          BUNDLE_ID="${BUNDLE_ID_RAW#${TEAM_ID}.}"
+          PROFILE_BUNDLE_ID_RAW=$(security cms -D -i /tmp/profile.mobileprovision | plutil -extract Entitlements.application-identifier raw -o - -)
+          PROFILE_BUNDLE_ID="${PROFILE_BUNDLE_ID_RAW#${TEAM_ID}.}"
+          BUNDLE_ID="app.polarbear5166.durian2960"
           PROFILE_NAME=$(security cms -D -i /tmp/profile.mobileprovision | plutil -extract Name raw -o - -)
 
           echo "Profile UUID: $PP_UUID"
           echo "Team ID: $TEAM_ID"
-          echo "Bundle ID: $BUNDLE_ID"
+          echo "Requested Bundle ID: $BUNDLE_ID"
+          echo "Profile Bundle ID: $PROFILE_BUNDLE_ID"
           echo "Profile name: $PROFILE_NAME"
 
-          if [ -z "$PP_UUID" ] || [ -z "$TEAM_ID" ] || [ -z "$BUNDLE_ID" ]; then
-            echo "::error::Failed to extract one or more required values from the provisioning profile."
+          if [ "$PROFILE_BUNDLE_ID" != "$BUNDLE_ID" ]; then
+            echo "::error::Provisioning profile authorizes $PROFILE_BUNDLE_ID, not $BUNDLE_ID."
             exit 1
           fi
 
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+
           cp /tmp/profile.mobileprovision \
             ~/Library/MobileDevice/Provisioning\ Profiles/${PP_UUID}.mobileprovision
-          ls ~/Library/MobileDevice/Provisioning\ Profiles/
 
-          # Make these available to later steps instead of hardcoding them
           echo "PP_UUID=$PP_UUID" >> "$GITHUB_ENV"
           echo "TEAM_ID=$TEAM_ID" >> "$GITHUB_ENV"
           echo "BUNDLE_ID=$BUNDLE_ID" >> "$GITHUB_ENV"
@@ -152,19 +140,14 @@ jobs:
           import re
 
           path = "ios/Runner.xcodeproj/project.pbxproj"
+
           with open(path) as f:
               content = f.read()
 
-          def required_env(name):
-              val = os.environ.get(name, "")
-              if not val:
-                  raise SystemExit(f"Missing required env var {name} - an earlier step should have set it.")
-              return val
-
-          bundle_id = required_env("BUNDLE_ID")
-          team_id = required_env("TEAM_ID")
-          pp_uuid = required_env("PP_UUID")
-          identity = required_env("CODE_SIGN_IDENTITY")
+          bundle_id = os.environ["BUNDLE_ID"]
+          team_id = os.environ["TEAM_ID"]
+          pp_uuid = os.environ["PP_UUID"]
+          identity = os.environ["CODE_SIGN_IDENTITY"]
 
           settings = {
               "PRODUCT_BUNDLE_IDENTIFIER": bundle_id,
@@ -176,36 +159,53 @@ jobs:
 
           def patch_block(match):
               block = match.group(0)
-              for key, val in settings.items():
+
+              for key, value in settings.items():
                   pattern = re.compile(rf"{key} = [^;]*;")
+
                   if pattern.search(block):
-                      block = pattern.sub(f"{key} = {val};", block)
+                      block = pattern.sub(
+                          f"{key} = {value};",
+                          block
+                      )
                   else:
                       block = re.sub(
                           r"(buildSettings = \{\n)",
-                          rf"\1\t\t\t\t{key} = {val};\n",
+                          rf"\1\t\t\t\t{key} = {value};\n",
                           block,
-                          count=1,
+                          count=1
                       )
+
               return block
 
-          content = re.sub(r"buildSettings = \{[^}]*\};", patch_block, content, flags=re.S)
+          content = re.sub(
+              r"buildSettings = \{[^}]*\};",
+              patch_block,
+              content,
+              flags=re.S
+          )
 
           with open(path, "w") as f:
               f.write(content)
 
-          print("Xcode project patched with values read from the actual cert/profile:")
-          for k, v in settings.items():
-              print(f"  {k} = {v}")
+          print("Xcode signing configuration:")
+          for key, value in settings.items():
+              print(f"  {key} = {value}")
           PYEOF
 
       - name: Flutter build iOS
-        run: flutter build ios --release --no-codesign --no-tree-shake-icons
+        run: |
+          flutter build ios \
+            --release \
+            --no-codesign \
+            --no-tree-shake-icons
 
       - name: xcodebuild archive
         run: |
           set -o pipefail
+
           cd ios
+
           xcodebuild archive \
             -workspace Runner.xcworkspace \
             -scheme Runner \
@@ -223,46 +223,77 @@ jobs:
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>ad-hoc</string>
+              <string>development</string>
+
               <key>teamID</key>
               <string>${TEAM_ID}</string>
+
               <key>signingStyle</key>
               <string>manual</string>
+
               <key>signingCertificate</key>
               <string>${CODE_SIGN_IDENTITY}</string>
+
               <key>provisioningProfiles</key>
               <dict>
                   <key>${BUNDLE_ID}</key>
                   <string>${PP_UUID}</string>
               </dict>
+
               <key>compileBitcode</key>
               <false/>
+
               <key>stripSwiftSymbols</key>
               <true/>
+
               <key>thinning</key>
               <string>&lt;none&gt;</string>
           </dict>
           </plist>
           EOF
+
+          echo "===== EXPORT OPTIONS ====="
           cat ios/ExportOptions.plist
+          echo "=========================="
+
+      - name: Verify export method
+        run: |
+          echo "Checking export method..."
+
+          METHOD=$(plutil \
+            -extract method raw \
+            -o - \
+            ios/ExportOptions.plist)
+
+          echo "Export method: $METHOD"
+
+          if [ "$METHOD" != "development" ]; then
+            echo "::error::Export method is '$METHOD' instead of 'development'."
+            exit 1
+          fi
 
       - name: Export IPA
         run: |
           set -o pipefail
+
           mkdir -p build/ios/ipa
+
           xcodebuild -exportArchive \
             -archivePath /tmp/BooruGallery.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist ios/ExportOptions.plist \
-            2>&1 | tee /tmp/export.log | tail -30
+            2>&1 | tee /tmp/export.log | tail -50
+
           find build/ios/ipa -name "*.ipa" -ls
 
       - name: Rename IPA
         run: |
           SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+
           find build/ios/ipa -name "*.ipa" | while read f; do
             mv "$f" "build/ios/ipa/BooruGallery_${{ github.ref_name }}_${SHA}.ipa"
           done
+
           ls -lh build/ios/ipa/
 
       - name: Upload IPA artifact
@@ -288,14 +319,18 @@ jobs:
         if: always()
         run: |
           security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
-          rm -f /tmp/cert.p12 /tmp/cert_and_key.pem /tmp/cert_final.p12 /tmp/profile.mobileprovision
+          rm -f \
+            /tmp/cert.p12 \
+            /tmp/cert_and_key.pem \
+            /tmp/cert_final.p12 \
+            /tmp/profile.mobileprovision
 
       - name: Build summary
         if: success()
         run: |
-          echo "## ✅ IPA Build Successful" >> $GITHUB_STEP_SUMMARY
+          echo "## IPA Build Successful" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Bundle ID | \`${BUNDLE_ID}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Team | ${CODE_SIGN_IDENTITY} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Method | Ad Hoc |" >> $GITHUB_STEP_SUMMARY
+          echo "| Signing Identity | ${CODE_SIGN_IDENTITY} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Method | Development |" >> $GITHUB_STEP_SUMMARY
