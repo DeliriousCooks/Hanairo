@@ -1,0 +1,61 @@
+# Fastfile — manual signing via imported P12 + mobileprovision
+# No match/certificate fetching needed; CI imports the secrets directly
+
+default_platform(:ios)
+
+platform :ios do
+
+  desc "Build a signed development IPA using imported P12 and provisioning profile"
+  lane :build_adhoc do
+
+    # ── 1. Import the distribution certificate from the P12 ──────────────────
+    import_certificate(
+      certificate_path:     ENV["P12_PATH"],
+      certificate_password: ENV["P12_PASSWORD"],
+      keychain_name:        ENV["KEYCHAIN_NAME"]    || "build.keychain",
+      keychain_password:    ENV["KEYCHAIN_PASSWORD"] || "temporary_keychain_pw"
+    )
+
+    # ── 2. Install the provisioning profile ──────────────────────────────────
+    install_provisioning_profile(
+      path: ENV["MOBILEPROVISION_PATH"]
+    )
+
+    # ── 3. Update Xcode project bundle ID & signing ──────────────────────────
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path:                  "ios/Runner.xcodeproj",
+      bundle_identifier:     "app.polarbear5166.durian2960",
+      team_id:               "LKRRVC93D7",
+      profile_uuid:          "de77d7a9-90e4-4b61-91ab-032ee2236adf",
+      code_sign_identity:    ENV["CODE_SIGN_IDENTITY"] || "Apple Development"
+    )
+
+    # ── 4. Build Flutter ──────────────────────────────────────────────────────
+    sh("flutter build ios --release --no-codesign")
+
+    # ── 5. Archive & export IPA ───────────────────────────────────────────────
+    build_app(
+      scheme:                  "Runner",
+      workspace:               "ios/Runner.xcworkspace",
+      configuration:           "Release",
+      export_method:           "development",
+      export_options:          {
+        method:               "development",
+        teamID:               "LKRRVC93D7",
+        signingStyle:         "manual",
+        signingCertificate:   ENV["CODE_SIGN_IDENTITY"] || "Apple Development",
+        provisioningProfiles: {
+          "app.polarbear5166.durian2960" => "de77d7a9-90e4-4b61-91ab-032ee2236adf"
+        }
+      },
+      output_directory:        "build/ios/ipa",
+      output_name:             "BooruGallery_Development.ipa",
+      clean:                   false,
+      skip_package_dependencies_resolution: false
+    )
+
+    UI.success "✅ IPA built: build/ios/ipa/BooruGallery_Development.ipa"
+  end
+
+end
