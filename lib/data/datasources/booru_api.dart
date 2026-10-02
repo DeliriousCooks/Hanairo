@@ -115,30 +115,67 @@ class Rule34xxxDataSource implements BooruDataSource {
 
   @override
   Future<List<String>> getTagSuggestions(String prefix) async {
-    // Rule34's normal tag-list DAPI does not provide the site's autocomplete
-    // behavior. The site's autocomplete service is exposed from the API host
-    // and returns {label, value, type} objects. Keep this request small and
-    // independent from post/tag-count requests so typing stays responsive.
+    final normalized = canonicalizeTag(prefix);
+    if (normalized.length < 2) return [];
+
+    // Rule34 has had more than one autocomplete host in circulation. Try the
+    // dedicated autocomplete host first, then the API host, and finally fall
+    // back to the tag DAPI. The DAPI fallback is especially useful on mobile
+    // networks where the autocomplete host can be unreachable.
+    for (final endpoint in const [
+      'https://ac.rule34.xxx/autocomplete.php',
+      'https://api.rule34.xxx/autocomplete.php',
+    ]) {
+      try {
+        final params = <String, dynamic>{'q': normalized};
+        if (_userId != null && _apiKey != null) {
+          params['user_id'] = _userId;
+          params['api_key'] = _apiKey;
+        }
+
+        final response = await _dio.get(
+          endpoint,
+          queryParameters: params,
+          options: Options(headers: {'Referer': 'https://rule34.xxx/'}),
+        ).timeout(const Duration(seconds: 2));
+
+        final data = response.data;
+        if (data is List) {
+          final tags = data
+              .whereType<Map>()
+              .map((row) => (row['value'] ?? row['name'] ?? row['label'] ?? '').toString())
+              .where((tag) => tag.isNotEmpty)
+              .toList();
+          if (tags.isNotEmpty) return tags;
+        }
+      } catch (_) {
+        // Try the next endpoint.
+      }
+    }
+
     try {
       final params = <String, dynamic>{
-        'q': prefix.toLowerCase(),
+        'page': 'dapi',
+        's': 'tag',
+        'q': 'index',
+        'name_pattern': '$normalized%',
+        'limit': 20,
+        'json': 1,
+        'orderby': 'count',
       };
       if (_userId != null && _apiKey != null) {
         params['user_id'] = _userId;
         params['api_key'] = _apiKey;
       }
-
-      final response = await _dio.get(
-        '/autocomplete.php',
-        queryParameters: params,
-      ).timeout(const Duration(seconds: 4));
-
+      final response = await _dio.get('/index.php', queryParameters: params)
+          .timeout(const Duration(seconds: 3));
       final data = response.data;
-      if (data is! List) return [];
-
-      return data
+      final rows = data is Map
+          ? (data['tag'] as List<dynamic>? ?? const [])
+          : (data is List ? data : const []);
+      return rows
           .whereType<Map>()
-          .map((row) => (row['value'] ?? row['name'] ?? '').toString())
+          .map((row) => (row['name'] ?? '').toString())
           .where((tag) => tag.isNotEmpty)
           .toList();
     } catch (_) {

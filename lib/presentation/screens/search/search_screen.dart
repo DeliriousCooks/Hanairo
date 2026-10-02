@@ -498,7 +498,8 @@ class _FloatingSearchHeader extends StatelessWidget {
             BlocBuilder<SearchBloc, SearchState>(
               buildWhen: (p, c) =>
                   p.tagSuggestions != c.tagSuggestions ||
-                  p.tagSuggestionCounts != c.tagSuggestionCounts,
+                  p.tagSuggestionCounts != c.tagSuggestionCounts ||
+                  p.tagSuggestionCountsBySource != c.tagSuggestionCountsBySource,
               builder: (context, state) {
                 if (state.tagSuggestions.isEmpty) return const SizedBox();
                 return Padding(
@@ -506,6 +507,8 @@ class _FloatingSearchHeader extends StatelessWidget {
                   child: _SuggestionsDropdown(
                     suggestions: state.tagSuggestions,
                     counts: state.tagSuggestionCounts,
+                    countsBySource: state.tagSuggestionCountsBySource,
+                    activeSources: state.activeSources,
                     onSelected: onSuggestionSelected,
                   ),
                 );
@@ -748,11 +751,15 @@ class _FilterButton extends StatelessWidget {
 class _SuggestionsDropdown extends StatelessWidget {
   final List<String> suggestions;
   final Map<String, int> counts;
+  final Map<BooruSource, Map<String, int>> countsBySource;
+  final List<BooruSource> activeSources;
   final ValueChanged<String> onSelected;
 
   const _SuggestionsDropdown({
     required this.suggestions,
     required this.counts,
+    required this.countsBySource,
+    required this.activeSources,
     required this.onSelected,
   });
 
@@ -803,24 +810,38 @@ class _SuggestionsDropdown extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (counts.containsKey(tag)) ...[
-                    const SizedBox(width: 10),
-                    Text.rich(
-                      TextSpan(
+                  if (counts.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      flex: 0,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          TextSpan(
-                            text: _formatTagCount(counts[tag]!),
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: theme.colorScheme.onSurface,
-                              fontWeight: FontWeight.w800,
-                            ),
+                          Wrap(
+                            alignment: WrapAlignment.end,
+                            spacing: 6,
+                            runSpacing: 0,
+                            children: [
+                              for (final source in activeSources)
+                                if (countsBySource[source]?[tag] != null)
+                                  Text(
+                                    '${source.shortName} ${_formatTagCount(countsBySource[source]![tag]!)}',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                            ],
                           ),
-                          TextSpan(
-                            text: ' posts',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                          if (counts[tag] != null)
+                            Text(
+                              'All ${_formatTagCount(counts[tag]!)}',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ),

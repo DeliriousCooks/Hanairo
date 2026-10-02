@@ -77,6 +77,7 @@ class SearchState extends Equatable {
   final String? errorMessage;
   final List<String> tagSuggestions;
   final Map<String, int> tagSuggestionCounts;
+  final Map<BooruSource, Map<String, int>> tagSuggestionCountsBySource;
   final Map<BooruSource, Map<String, int>> tagCountsBySource;
 
   const SearchState({
@@ -95,6 +96,7 @@ class SearchState extends Equatable {
     this.errorMessage,
     this.tagSuggestions = const [],
     this.tagSuggestionCounts = const {},
+    this.tagSuggestionCountsBySource = const {},
     this.tagCountsBySource = const {},
   });
 
@@ -127,6 +129,7 @@ class SearchState extends Equatable {
     List<String>? tagSuggestions,
     Map<String, int>? tagSuggestionCounts,
     bool clearTagSuggestionCounts = false,
+    Map<BooruSource, Map<String, int>>? tagSuggestionCountsBySource,
     Map<BooruSource, Map<String, int>>? tagCountsBySource,
     bool clearTagCounts = false,
   }) {
@@ -148,6 +151,9 @@ class SearchState extends Equatable {
       tagSuggestionCounts: clearTagSuggestionCounts
           ? const {}
           : (tagSuggestionCounts ?? this.tagSuggestionCounts),
+      tagSuggestionCountsBySource: clearTagSuggestionCounts
+          ? const {}
+          : (tagSuggestionCountsBySource ?? this.tagSuggestionCountsBySource),
       tagCountsBySource: clearTagCounts ? const {} : (tagCountsBySource ?? this.tagCountsBySource),
     );
   }
@@ -184,6 +190,7 @@ class SearchState extends Equatable {
         errorMessage,
         tagSuggestions,
         tagSuggestionCounts,
+        tagSuggestionCountsBySource,
         tagCountsBySource,
       ];
 }
@@ -225,7 +232,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     on<SearchRefreshed>(_onSearchRefreshed);
     on<SearchQueryChanged>(_onQueryChanged,
         transformer: (events, mapper) =>
-            events.debounceTime(const Duration(milliseconds: 300)).switchMap(mapper));
+            events.debounceTime(const Duration(milliseconds: 140)).switchMap(mapper));
     on<SearchCleared>(_onSearchCleared);
     on<SearchSourceToggled>(_onSourceToggled);
     on<SearchFilterChanged>(_onFilterChanged);
@@ -479,23 +486,42 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     }
 
     try {
+      // Ask every active source concurrently. Previously this deliberately used
+      // only the first source, which meant a broken/slow R34 autocomplete could
+      // leave the entire dropdown empty even when E621 had valid suggestions.
       final suggestions = await _searchRepo.getTagSuggestions(
         lastTag,
-        state.activeSources.length > 1
-            ? state.activeSources.take(1).toList()
-            : state.activeSources,
+        state.activeSources,
       );
       if (emit.isDone || state.suggestionQuery != query) return;
+
+      final visibleSuggestions = suggestions.take(5).toList();
       emit(state.copyWith(
-        tagSuggestions: suggestions.take(5).toList(),
+        tagSuggestions: visibleSuggestions,
         clearTagSuggestionCounts: true,
       ));
 
-      // Do not fetch count endpoints while the user is typing. Those extra
-      // requests were the main source of autocomplete lag. Counts for the
-      // submitted search are loaded separately after the first results appear.
-      if (!emit.isDone && state.suggestionQuery == query) {
-        emit(state.copyWith(clearTagSuggestionCounts: true));
+      // Counts are deliberately loaded after the suggestions are painted so
+      // the dropdown is not blocked by count requests. Each suggestion gets
+      // an exact count for every active site, plus a combined total.
+      if (visibleSuggestions.isNotEmpty) {
+        final countsBySource = await _searchRepo.getTagCountsForTags(
+          visibleSuggestions,
+          state.activeSources,
+        );
+        if (emit.isDone || state.suggestionQuery != query) return;
+
+        final combined = <String, int>{};
+        for (final sourceCounts in countsBySource.values) {
+          for (final entry in sourceCounts.entries) {
+            combined.update(entry.key, (value) => value + entry.value,
+                ifAbsent: () => entry.value);
+          }
+        }
+        emit(state.copyWith(
+          tagSuggestionCounts: combined,
+          tagSuggestionCountsBySource: countsBySource,
+        ));
       }
     } catch (e) {
       if (!emit.isDone && state.suggestionQuery == query) {
