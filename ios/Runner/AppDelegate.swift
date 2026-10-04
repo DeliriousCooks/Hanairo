@@ -1,46 +1,28 @@
 import UIKit
 import Flutter
-import AVFoundation
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
-  private var volumeObserver: NSKeyValueObservation?
-  private var volumeChannel: FlutterMethodChannel?
-
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
 
-    if let controller = window?.rootViewController as? FlutterViewController {
-      let channel = FlutterMethodChannel(
-        name: "app.booruwave/hardware_volume",
-        binaryMessenger: controller.binaryMessenger
-      )
-      volumeChannel = channel
+    // Do not globally activate an AVAudioSession here.
+    //
+    // Activating a playback session at app launch can make iOS treat Booru as
+    // the current media/audio app even when another app (such as YouTube) is
+    // playing. That can interfere with the Dynamic Island / Now Playing
+    // hand-off and cause taps on another app's media activity to return to
+    // Booru.
+    //
+    // Video playback should configure audio only while Booru is actually
+    // playing a video.
 
-      let session = AVAudioSession.sharedInstance()
-      try? session.setCategory(.playback, mode: .moviePlayback, options: [.mixWithOthers])
-      try? session.setActive(true)
-
-      volumeObserver = session.observe(\AVAudioSession.outputVolume, options: [.old, .new]) { [weak self] _, change in
-        guard
-          let old = change.oldValue as? Float,
-          let new = change.newValue as? Float,
-          new > old + 0.001
-        else { return }
-
-        DispatchQueue.main.async {
-          self?.volumeChannel?.invokeMethod("volumeUp", arguments: new)
-        }
-      }
-    }
-
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
-  }
-
-  deinit {
-    volumeObserver?.invalidate()
+    return super.application(
+      application,
+      didFinishLaunchingWithOptions: launchOptions
+    )
   }
 }

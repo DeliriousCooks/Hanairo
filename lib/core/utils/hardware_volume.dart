@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
 
-/// Bridges iOS hardware-volume changes into Dart. The native side reports
-/// only upward volume changes; viewers use that as an intuitive "unmute"
-/// gesture when a video is muted.
+/// Optional bridge for hardware-volume events.
+///
+/// The iOS app no longer installs a global AVAudioSession observer at launch,
+/// because doing so can interfere with iOS Now Playing / Dynamic Island
+/// ownership when another app (for example YouTube) is playing.
 class HardwareVolumeService {
   HardwareVolumeService._();
   static final HardwareVolumeService instance = HardwareVolumeService._();
