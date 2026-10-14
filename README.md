@@ -1,101 +1,85 @@
-# BooruWave UI update v18
+# Hanairo
 
-This is the v18 source overlay, based on v17. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
+[![License](https://img.shields.io/github/license/youshen2/Hanairo)](https://github.com/youshen2/Hanairo/blob/master/LICENSE)
+[![Download](https://img.shields.io/github/v/release/youshen2/Hanairo)](https://github.com/youshen2/Hanairo/releases)
+[![stars](https://img.shields.io/github/stars/youshen2/Hanairo)](https://github.com/youshen2/Hanairo/stargazers)
 
-## v18 finishing fixes
+Hanairo 是使用 SwiftUI 与 Apple 系统框架实现的第三方 Pixiv 客户端，遵守液态玻璃设计风格。
 
-- Vertically moved the search field itself down 12 logical pixels inside its unchanged-height dock so its hint and typed text line up with the search and filter buttons.
-- Added horizontal swipes between the main tabs. A right swipe from Search returns to Feed; a left swipe moves to Favorites. The keyboard is dismissed during tab changes.
-- Added a Recent Searches list to the empty Search screen. Tap a previous query to run it again, or Clear to erase local search history.
-- Reset stale results on a fresh blank Search visit so the empty/recent state appears consistently.
-# BooruWave UI update v17
+[![Telegram Group](https://img.shields.io/badge/Telegram-加入群组-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/hanairo_official)
 
-This is the v17 source overlay, based on v16. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
+## 应用截图
 
-## v17 search-field alignment fix
+<p align="center">
+  <img src="docs/screenshots/01.png" alt="Hanairo 应用截图 1" width="20%">
+  <img src="docs/screenshots/02.png" alt="Hanairo 应用截图 2" width="20%">
+  <img src="docs/screenshots/03.png" alt="Hanairo 应用截图 3" width="20%">
+  <br>
+  <img src="docs/screenshots/04.png" alt="Hanairo 应用截图 4" width="20%">
+  <img src="docs/screenshots/05.png" alt="Hanairo 应用截图 5" width="20%">
+  <img src="docs/screenshots/06.png" alt="Hanairo 应用截图 6" width="20%">
+</p>
 
-- Vertically adjusted the search hint and entered text so they appear optically centered in the glass search dock.
-# BooruWave UI update v16
+## 当前功能
 
-This is the v16 source overlay, based on v15. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
+- 推荐插画与漫画
+- 日榜、周榜、月榜和历史日期排行
+- 公开收藏与关注动态
+- 热门标签、作品搜索和用户搜索
+- 多页作品详情、标签、作者、统计和相关作品
+- 原图大图查看、双击与手势缩放、多页切换
+- 浮动收藏、分享与原图下载操作栏
+- 作者资料、关注与作品列表
+- 收藏、关注、分享和内容过滤
+- 强制登录根路由，未认证时无法进入主界面
+- PKCE 系统浏览器授权、自动回调与 Refresh Token 登录
+- 钥匙串保存令牌、自动刷新令牌和 401 重试
 
-## v16 search-field finishing fix
+## 目录结构
 
-- Removed the inherited filled-card background from the inline “Search tags…” field. The placeholder and entered text now sit directly on the main glass search dock, matching the supplied edited reference; the search dock, search button, filter button, and tag chips retain their own surfaces.
-# BooruWave UI update v15
+```text
+Hanairo/
+├── App/          应用入口、标签栏与路由
+├── Components/   可复用的纯 SwiftUI 组件
+├── Core/
+│   ├── Models/       Pixiv 与认证数据模型
+│   ├── Networking/   HTTP、OAuth 与 Pixiv API
+│   ├── Persistence/  钥匙串持久化
+│   ├── Services/     会话、设置、图片与仓储服务
+│   └── Support/      加载状态、预览依赖与文本工具
+└── Features/     按产品功能拆分的页面
+```
 
-This is the v15 source overlay, based on v14. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
+视图只负责展示和局部交互，网络请求集中在 `PixivAPI`，登录状态集中在 `AuthenticationStore`，业务入口集中在 `PixivRepository`。
 
-## v15 finishing fixes
+## 构建
 
-- Put selected search tags on their own horizontally scrollable row, auto-scroll to the newest tag, and keep the plain text entry borderless so its hint can never cover the chips.
-- Added a clear-search control that removes all chips and text and returns Search to its empty state while preserving source and filter choices; in-flight results can no longer repopulate a cleared search.
-- Kept autocomplete text separate from the submitted search query so pending suggestions can't corrupt result counts or interrupt a search after Enter.
-- Fixed favorite-tag persistence when the list is empty (the previous empty-list value was immutable, so the first favorite could not be inserted). Added compatibility for older list-shaped stored values and made tag tap/hold use a Material ink gesture.
-- Painted the glass edge above the clipped blur so rounded borders stay continuous, strengthened the compact search source-chip outlines, and reduced the bottom dock and selected-tab footprint.
-- Updated Search when a tag link changes the route while Search is already open.
+使用 Xcode 打开 `Hanairo.xcodeproj` 后运行 `Hanairo` Scheme。项目当前可编译到 iOS、macOS 与 visionOS；macOS 沙盒仅申请了网络客户端权限。
 
-The original v14 notes follow.
+运行 `bash build_ios_unsigned.sh` 可以在 `build/` 目录生成 iOS 未签名 IPA。GitHub Actions 会在 main 分支、Pull Request、`v*` 标签和手动触发时执行同一构建；标签构建完成后会自动创建 GitHub Release。
 
-This is a source overlay for the existing Flutter app. Copy the `lib` folder and the included logo asset over the matching paths in your project. No dependency changes are required.
+### Telegram CI 发布
 
-## Changes in v14
+每次 CI 成功生成 IPA 后，GitHub Actions 会将上一次成功编译到本次编译之间的 Commit 汇总作为 Caption，并把 `Hanairo-iOS-unsigned.ipa` 附在同一条 Telegram 消息中。Caption 超过 Telegram 长度限制时会保留可容纳的 Commit，并注明省略数量及 Actions 链接。外部 Fork 发起的 Pull Request 不会读取仓库 Secrets，因此只构建和保存产物，不会发送到频道。
 
-- Reworked Search into a more substantial floating glass dock: separate search and filter controls, a plain inline query field, horizontally scrolling tag chips, and rounded suggestions.
-- Increased tab dock contrast and label legibility so the icons and names stay clear against changing content behind the glass.
-- Added Posts and Favorite Tags sections to Favorites. Tap a post tag to search it; press and hold briefly to save or remove it from Favorite Tags.
-- Added a persistent 2 / 3 / 4 column control to Feed, sharing the saved Grid Columns preference with Settings and Favorites. The default remains the existing two-column feed.
-- Added a single-post feed mode that loads the original image URL and fits the complete image inside the media area. Double-tap to favorite and press and hold to export an image or video to Photos.
-- Reused the Photos export helper in both the single-post feed and full-screen viewer, including the existing WebM-to-MP4 conversion path.
-- Fixed the missing closing parenthesis in the search input reported by the iOS release build.
+配置方式：
 
-## Finishing fixes
+1. 通过 Telegram 的 `@BotFather` 创建机器人并取得 Bot Token。
+2. 将机器人添加为目标频道管理员，并授予发布消息权限。
+3. 在 GitHub 仓库的 `Settings > Secrets and variables > Actions` 中添加以下 Repository secrets：
+   - `TELEGRAM_BOT_TOKEN`：机器人 Token。
+   - `TELEGRAM_CHAT_ID`：频道标识；公开频道可填写 `@频道用户名`，私有频道可填写 `-100` 开头的数字 ID。
 
-- Removed the extra inset search-field box so tags and query text sit in the main glass search dock. Tapping a suggestion adds it to the query and keeps Search open; search submission now happens on the keyboard's Search/Enter action.
-- Made favorite-tag gestures work both in the post tag panel and on the visible tag chips. Tap to search; press and hold to save or remove the tag, with an immediate confirmation and saved-state indicator.
-- Increased the glass dock's edge contrast and inset spacing around the tab highlight so the tab bar border stays visible.
-- Tied video playback to the active viewer page and single-post feed visibility. Swiping pauses and mutes the old video; the feed resumes it only if that same post remains in view.
+如果任一 Secret 缺失、机器人没有频道发布权限或 Telegram 上传失败，`Send IPA to Telegram channel` 任务会失败并显示原因。
 
-## Changes in v13
+`v*` 标签在 GitHub Release 创建成功后会改发版本更新消息，附带 Release IPA，并以非静默方式发送后自动置顶。机器人还需要频道的置顶消息权限；标签构建不会重复发送普通 CI 消息。Telegram 不会因频道置顶额外通知所有成员，最终通知仍受订阅者的频道通知设置影响。
 
-- Added a persistent grid / single-column feed switch.
-- Replaced the feed's generic “Following” concept with a Saved Tag Mix that loads recent posts for saved searches. Save or remove a tag from the search results header; saved tags also appear as quick links on Feed.
-- Kept stories out of the Feed.
-- Enlarged the search input and constrained its width so the typed text has room beside chips.
-- Dismissed the keyboard on search submission and before opening a post.
-- Added exact tag counts to the first five autocomplete suggestions, summed across enabled sources. Search result headers show the combined tag count in bold with per-source counts below.
-- Validated Rule34.xxx's numeric User ID and API key against its API before reporting an account connection as successful.
-- Updated WebM-to-MP4 conversion success checks to use FFmpegKit's `ReturnCode.isValueSuccess()` API, avoiding the unresolved `ReturnCode` symbol from the previous iOS build log.
+## 说明
 
-The Rule34 account form uses its API User ID and generated API key because the site's API requires credentials for API requests. See the [Rule34 API help](https://rule34.xxx/?page=help&topic=dapi) and [API key announcement](https://rule34.xxx/index.php?id=9793&page=forum&pid=45&s=view).
+Pixiv 的移动端接口并非公开稳定 API，接口或授权流程变化时需要同步调整网络层。功能结构参考了 [PixEz Flutter](https://github.com/Notsfsssf/pixez-flutter)。
 
-## Changes in v12
+Hanairo 与 pixiv Inc. 没有隶属关系。
 
-- Added an adaptive, clipped glass surface for the floating navigation dock, home quick-search control, and search header/input.
-- Kept the selected tab highlight compact, with a softer tint in light mode and a contained accent in dark mode.
-- Added the Petal theme preset to match the newer pastel direction; OLED Black remains available.
-- Added light haptic feedback when changing destinations.
+## 许可证
 
-The glass surfaces use Flutter's `BackdropFilter` with translucent fills and edge highlights. They are a Liquid Glass-inspired cross-platform treatment, not Apple's native refractive `UIGlassEffect`. Flutter's current iOS compatibility page says iOS 26 is supported and tracks Liquid Glass as a feature not yet fully implemented in the framework. The same UI has a fallback on older iOS and Android. No iOS 27-specific API is assumed.
-
-Glass is limited to navigation and search controls so the art and feed content remain visually clear.
-
-## Changes
-
-- Gave each tab a fixed, compact highlight capsule and made the dock surface opaque enough to keep the background colors from blending across the bar.
-- Added a short fade and lift animation when changing tabs.
-- Stopped empty Feed and Search screens from bouncing into a larger blank area.
-- Made source chips refresh an active query immediately.
-- Added adjacent-post preloading and clipped, non-bouncing paging in the full-screen viewer.
-- Updated Paheal post and tag requests to Shimmie's current API routes.
-- Kept API errors and authentication failures visible instead of showing them as zero results. Failed Rule34 and Gelbooru requests include a direct account connection action.
-- Fixed Gelbooru credentials to use User ID and API Key fields, and passed saved Rule34/Gelbooru credentials to search, tag-count, and suggestion requests.
-
-Rule34 currently requires API credentials for API search requests. Gelbooru may require them at times. The auth screens explain where to retrieve each site's credentials.
-
-
-
-
-## iOS Bundle ID
-
-BooruBot uses `app.starfruit8199.boorubot` as its iOS Bundle ID. The provisioning profile used for signing must authorize this exact App ID; the CI workflow validates this instead of silently adopting the profile's old identifier.
+Hanairo 依据 [Mozilla Public License 2.0](LICENSE) 发布，SPDX 标识为 `MPL-2.0`。
