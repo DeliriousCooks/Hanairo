@@ -9,8 +9,8 @@ enum SearchScope: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .illustrations: "作品"
-        case .users: "用户"
+        case .illustrations: "Artworks"
+        case .users: "Users"
         }
     }
 }

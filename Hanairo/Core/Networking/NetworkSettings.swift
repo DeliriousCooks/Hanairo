@@ -11,17 +11,17 @@ enum AppNetworkMode: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var title: String {
         switch self {
-        case .system: "跟随系统"
-        case .direct: "直连"
-        case .httpProxy: "HTTP 代理"
+        case .system: "Follow System"
+        case .direct: "Direct"
+        case .httpProxy: "HTTP Proxy"
         }
     }
 
     var description: String {
         switch self {
-        case .system: "使用系统网络、DNS、VPN 与代理设置"
-        case .direct: "忽略系统 HTTP 代理，仍使用系统 DNS"
-        case .httpProxy: "为 Hanairo 的 API 与图片请求指定代理"
+        case .system: "Use system network, DNS, VPN, and proxy settings"
+        case .direct: "Ignore the system HTTP proxy but still use system DNS"
+        case .httpProxy: "Specify a proxy for Hanairo's API and image requests"
         }
     }
 }

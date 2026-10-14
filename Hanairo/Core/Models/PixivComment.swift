@@ -81,7 +81,7 @@ struct PixivCommentUser: Decodable, Identifiable, Hashable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(Int.self, forKey: .id)
-        name = try container.decodeIfPresent(String.self, forKey: .name) ?? "未知用户"
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? "Unknown User"
         account = try container.decodeIfPresent(String.self, forKey: .account) ?? ""
         profileImageURLs = try container.decodeIfPresent(
             PixivProfileImageURLs.self,

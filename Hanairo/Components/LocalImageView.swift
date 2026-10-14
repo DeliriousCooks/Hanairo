@@ -19,11 +19,11 @@ struct LocalImageView: View {
                         .clipped()
                 } else if didFail {
                     Color.gray.opacity(0.28)
-                        .accessibilityLabel("本地图片读取失败")
+                        .accessibilityLabel("Failed to read local image")
                 } else {
                     ProgressView()
                         .controlSize(.small)
-                        .accessibilityLabel("正在读取本地图片")
+                        .accessibilityLabel("Reading local image")
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)

@@ -49,7 +49,7 @@ struct ArtworkPagesView: View {
                         }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("查看第 \(index + 1) 页大图")
+                .accessibilityLabel("View page \(index + 1) full size")
             }
         }
         .frame(maxWidth: .infinity)

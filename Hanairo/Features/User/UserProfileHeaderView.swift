@@ -64,7 +64,7 @@ struct UserProfileHeaderView: View {
             .clipped()
             .overlay(Circle().stroke(.white.opacity(0.9), lineWidth: 4))
             .shadow(color: .black.opacity(0.22), radius: 14, y: 6)
-            .accessibilityLabel("\(detail.user.name)的头像")
+            .accessibilityLabel("\(detail.user.name)'s avatar")
     }
 
     @ViewBuilder
@@ -130,7 +130,7 @@ struct UserProfileHeaderView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(detail.user.name)
         .accessibilityValue("@\(detail.user.account)")
-        .accessibilityHint(isNameExpanded ? "轻点收起昵称" : "轻点展开完整昵称")
+        .accessibilityHint(isNameExpanded ? "Tap to collapse name" : "Tap to expand full name")
     }
 
     @ViewBuilder
@@ -142,19 +142,19 @@ struct UserProfileHeaderView: View {
 
     private var statisticsContent: some View {
         HStack(spacing: 0) {
-            StatLabel(value: detail.profile.totalIllusts, title: "插画")
+            StatLabel(value: detail.profile.totalIllusts, title: "Illustrations")
             Divider().frame(height: 42)
-            StatLabel(value: detail.profile.totalManga, title: "漫画")
+            StatLabel(value: detail.profile.totalManga, title: "Manga")
             Divider().frame(height: 42)
             ProfileConnectionStatLink(
                 value: detail.profile.totalFollowUsers,
-                title: "关注",
+                title: "Following",
                 route: .userConnections(userID: detail.user.id, kind: .following)
             )
             Divider().frame(height: 42)
             ProfileConnectionStatLink(
                 value: nil,
-                title: "粉丝",
+                title: "Followers",
                 route: .userConnections(userID: detail.user.id, kind: .followers)
             )
         }
@@ -221,7 +221,7 @@ private struct ProfileConnectionStatLink: View {
                     Text(value, format: .number.notation(.compactName))
                         .font(.headline)
                 } else {
-                    Text("查看")
+                    Text("View")
                         .font(.headline)
                 }
 
@@ -237,6 +237,6 @@ private struct ProfileConnectionStatLink: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityHint("查看\(title)列表")
+        .accessibilityHint("View \(title) list")
     }
 }

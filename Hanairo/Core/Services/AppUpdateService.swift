@@ -90,9 +90,9 @@ enum AppUpdateError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noRelease:
-            "当前仓库还没有发布版本。"
+            "The repository has no published releases yet."
         case .invalidRelease:
-            "发布信息格式不完整。"
+            "The release information is incomplete."
         }
     }
 }

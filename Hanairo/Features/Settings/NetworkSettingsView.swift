@@ -12,7 +12,7 @@ struct NetworkSettingsView: View {
 
         Form {
             Section {
-                Picker("连接模式", selection: $settings.mode) {
+                Picker("Connection Mode", selection: $settings.mode) {
                     ForEach(AppNetworkMode.allCases) { mode in
                         Text(mode.title).tag(mode)
                     }
@@ -20,81 +20,81 @@ struct NetworkSettingsView: View {
                 Text(settings.mode.description)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                Toggle("允许使用蜂窝网络", isOn: $settings.allowsCellularAccess)
+                Toggle("Allow Cellular Data", isOn: $settings.allowsCellularAccess)
                 Stepper(
-                    "请求超时 \(settings.requestTimeout) 秒",
+                    "Request Timeout: \(settings.requestTimeout) s",
                     value: $settings.requestTimeout,
                     in: NetworkSettings.timeoutRange,
                     step: 5
                 )
             } header: {
-                Text("连接")
+                Text("Connection")
             } footer: {
-                Text("网络配置会在下一次请求时生效。切换配置会取消旧连接，但不会清除缓存或登录状态。")
+                Text("Network settings take effect on the next request. Switching configurations cancels existing connections but doesn't clear caches or your sign-in status.")
             }
 
             if settings.mode == .httpProxy {
                 Section {
-                    TextField("代理主机", text: $settings.proxyHost)
-                    TextField("代理端口", value: $settings.proxyPort, format: .number)
-                    validationRow(title: "代理配置", isValid: settings.hasValidProxy)
+                    TextField("Proxy Host", text: $settings.proxyHost)
+                    TextField("Proxy Port", value: $settings.proxyPort, format: .number)
+                    validationRow(title: "Proxy Configuration", isValid: settings.hasValidProxy)
                 } header: {
-                    Text("HTTP 代理")
+                    Text("HTTP Proxy")
                 } footer: {
-                    Text("HTTP 与 HTTPS 请求会通过同一代理发送。Hanairo 不会绕过 TLS 证书校验。")
+                    Text("HTTP and HTTPS requests are sent through the same proxy. Hanairo doesn't bypass TLS certificate validation.")
                 }
             }
 
             Section {
-                TextField("API 基础地址", text: $settings.apiBaseURLString)
-                validationRow(title: "API 地址", isValid: settings.hasValidAPIBaseURL)
-                TextField("OAuth 基础地址", text: $settings.oauthBaseURLString)
-                validationRow(title: "OAuth 地址", isValid: settings.hasValidOAuthBaseURL)
-                TextField("图片域名（可选）", text: $settings.imageHostOverride)
-                validationRow(title: "图片域名", isValid: settings.hasValidImageHost)
+                TextField("API Base URL", text: $settings.apiBaseURLString)
+                validationRow(title: "API URL", isValid: settings.hasValidAPIBaseURL)
+                TextField("OAuth Base URL", text: $settings.oauthBaseURLString)
+                validationRow(title: "OAuth URL", isValid: settings.hasValidOAuthBaseURL)
+                TextField("Image Host (Optional)", text: $settings.imageHostOverride)
+                validationRow(title: "Image Host", isValid: settings.hasValidImageHost)
             } header: {
-                Text("服务地址")
+                Text("Service URLs")
             } footer: {
-                Text("服务地址必须使用 HTTPS。图片域名只替换 i.pximg.net 与 s.pximg.net，不改变图片路径。留空即使用 Pixiv 原地址。")
+                Text("Service URLs must use HTTPS. The image host only replaces i.pximg.net and s.pximg.net and doesn't change image paths. Leave blank to use Pixiv's original address.")
             }
 
-            Section("连通性检测") {
+            Section("Connectivity Test") {
                 diagnosticRow(title: "Pixiv API", state: apiState) {
                     apiState = .testing
                     apiState = await NetworkDiagnosticsService(settings: settings).testAPI()
                 }
-                diagnosticRow(title: "Pixiv 图片", state: imageState) {
+                diagnosticRow(title: "Pixiv Images", state: imageState) {
                     imageState = .testing
                     imageState = await NetworkDiagnosticsService(settings: settings).testImage()
                 }
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("网络")
+        .navigationTitle("Network")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("恢复默认", systemImage: "arrow.counterclockwise") {
+                Button("Restore Defaults", systemImage: "arrow.counterclockwise") {
                     showsResetConfirmation = true
                 }
                 .labelStyle(.iconOnly)
             }
         }
         .confirmationDialog(
-            "恢复默认网络设置？",
+            "Restore default network settings?",
             isPresented: $showsResetConfirmation,
             titleVisibility: .visible
         ) {
-            Button("恢复默认", role: .destructive) {
+            Button("Restore Defaults", role: .destructive) {
                 settings.reset()
                 apiState = .idle
                 imageState = .idle
             }
-            Button("取消", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         }
     }
 
     private func validationRow(title: String, isValid: Bool) -> some View {
-        Label(isValid ? "\(title)有效" : "\(title)无效，将回退到默认值", systemImage: isValid ? "checkmark.circle" : "exclamationmark.triangle")
+        Label(isValid ? "\(title) is valid" : "\(title) is invalid and will fall back to the default", systemImage: isValid ? "checkmark.circle" : "exclamationmark.triangle")
             .font(.caption)
             .foregroundStyle(isValid ? Color.secondary : Color.red)
     }
@@ -138,7 +138,7 @@ struct NetworkSettingsView: View {
     }
 }
 
-#Preview("网络设置") {
+#Preview("Network Settings") {
     NavigationStack {
         NetworkSettingsView()
     }

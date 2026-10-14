@@ -14,6 +14,6 @@ struct AuthenticationErrorView: View {
 }
 
 #Preview {
-    AuthenticationErrorView(message: "令牌无效，请重新检查。")
+    AuthenticationErrorView(message: "Invalid token. Please check it and try again.")
         .padding()
 }

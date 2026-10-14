@@ -131,11 +131,11 @@ enum ReverseImageSearchError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidImage:
-            "无法读取所选图片，请尝试其他图片"
+            "Couldn't read the selected image. Try a different one."
         case .encodingFailed:
-            "图片处理失败，请尝试其他图片"
+            "Image processing failed. Try a different image."
         case .rateLimited:
-            "SauceNAO 搜索次数已达当前限制，请稍后再试"
+            "The SauceNAO search limit has been reached. Please try again later."
         }
     }
 }

@@ -53,7 +53,7 @@ struct UserDetailView: View {
                 ShareLink(item: PixivWebLinks.user(id: userID)) {
                     Image(systemName: "square.and.arrow.up")
                 }
-                .accessibilityLabel("分享作者主页")
+                .accessibilityLabel("Share artist profile")
             }
 
             if
@@ -63,7 +63,7 @@ struct UserDetailView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Button(
-                            "屏蔽作者",
+                            "Block Artist",
                             systemImage: "person.crop.circle.badge.minus",
                             role: .destructive
                         ) {
@@ -72,7 +72,7 @@ struct UserDetailView: View {
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
-                    .accessibilityLabel("更多操作")
+                    .accessibilityLabel("More actions")
                 }
             }
         }
@@ -85,24 +85,24 @@ struct UserDetailView: View {
         .task(id: profileThemeImageURL) {
             await updateProfileAccent()
         }
-        .alert("操作失败", isPresented: actionErrorBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Action Failed", isPresented: actionErrorBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(displayedError ?? "未知错误")
+            Text(displayedError ?? "Unknown error")
         }
         .confirmationDialog(
-            "屏蔽这位作者？",
+            "Block this artist?",
             isPresented: $showsBlockConfirmation,
             titleVisibility: .visible
         ) {
-            Button("屏蔽作者", role: .destructive) {
+            Button("Block Artist", role: .destructive) {
                 guard case let .loaded(detail) = detailState else { return }
                 localBlocks.block(user: detail.user)
                 dismiss()
             }
-            Button("取消", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("该作者的作品与用户条目将在 Hanairo 中隐藏。")
+            Text("This artist's artworks and user entries will be hidden in Hanairo.")
         }
     }
 
@@ -121,7 +121,7 @@ struct UserDetailView: View {
 
                     loadingProfile(user, availableSize: proxy.size)
                 } else {
-                    ProgressView("正在加载作者…")
+                    ProgressView("Loading artist…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
@@ -161,7 +161,7 @@ struct UserDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                ProgressView("正在加载作者资料…")
+                ProgressView("Loading artist profile…")
                     .font(.subheadline)
                     .padding(.top, 42)
             }
@@ -248,7 +248,7 @@ struct UserDetailView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             if !usesMenuFilter {
-                Picker("作者内容", selection: $selectedSection) {
+                Picker("Artist Content", selection: $selectedSection) {
                     ForEach(AuthorArtworkSection.allCases) { section in
                         Text(section.title).tag(section)
                     }
@@ -291,7 +291,7 @@ struct UserDetailView: View {
 
             if usesMenuFilter {
                 Menu {
-                    Picker("作者内容", selection: $selectedSection) {
+                    Picker("Artist Content", selection: $selectedSection) {
                         ForEach(AuthorArtworkSection.allCases) { section in
                             Label(section.title, systemImage: section.systemImage)
                                 .tag(section)
@@ -361,7 +361,7 @@ struct UserDetailView: View {
 
     private var navigationTitle: String {
         if case .failed = detailState {
-            return "作者主页"
+            return "Artist Profile"
         }
         return ""
     }
@@ -516,17 +516,17 @@ private enum AuthorArtworkSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .illustrations: "插画"
-        case .manga: "漫画"
-        case .bookmarks: "收藏"
+        case .illustrations: "Illustrations"
+        case .manga: "Manga"
+        case .bookmarks: "Bookmarks"
         }
     }
 
     var heading: String {
         switch self {
-        case .illustrations: "作品"
-        case .manga: "漫画"
-        case .bookmarks: "收藏"
+        case .illustrations: "Artworks"
+        case .manga: "Manga"
+        case .bookmarks: "Bookmarks"
         }
     }
 
@@ -540,9 +540,9 @@ private enum AuthorArtworkSection: String, CaseIterable, Identifiable {
 
     var emptyTitle: String {
         switch self {
-        case .illustrations: "暂无公开插画"
-        case .manga: "暂无公开漫画"
-        case .bookmarks: "暂无公开收藏"
+        case .illustrations: "No Public Illustrations"
+        case .manga: "No Public Manga"
+        case .bookmarks: "No Public Bookmarks"
         }
     }
 
@@ -555,7 +555,7 @@ private enum AuthorArtworkSection: String, CaseIterable, Identifiable {
     }
 }
 
-#Preview("作者主页") {
+#Preview("Artist Profile") {
     NavigationStack {
         UserDetailView(userID: 101)
     }

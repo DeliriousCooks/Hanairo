@@ -34,7 +34,7 @@ struct ArtworkCard: View {
                                     .background(.black.opacity(0.62), in: Capsule())
                             }
                             if illustration.isUgoira {
-                                Label("动图", systemImage: "play.fill")
+                                Label("Ugoira", systemImage: "play.fill")
                                     .font(.caption2.weight(.semibold))
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 8)
@@ -63,7 +63,7 @@ struct ArtworkCard: View {
             bookmarkButton
                 .disabled(isChangingBookmark)
                 .padding(8)
-                .accessibilityLabel(isBookmarked ? "取消收藏" : "收藏")
+                .accessibilityLabel(isBookmarked ? "Remove bookmark" : "Bookmark")
         }
         .frame(maxWidth: .infinity)
         .clipped()
@@ -72,14 +72,14 @@ struct ArtworkCard: View {
                 enqueueDownload()
             }
             Divider()
-            Button("屏蔽作品", systemImage: "photo.badge.minus", role: .destructive) {
+            Button("Block Artwork", systemImage: "photo.badge.minus", role: .destructive) {
                 localBlocks.block(artwork: illustration)
             }
-            Button("屏蔽作者", systemImage: "person.crop.circle.badge.minus", role: .destructive) {
+            Button("Block Artist", systemImage: "person.crop.circle.badge.minus", role: .destructive) {
                 localBlocks.block(user: illustration.user)
             }
             if !illustration.tags.isEmpty {
-                Menu("屏蔽标签", systemImage: "number") {
+                Menu("Block Tag", systemImage: "number") {
                     ForEach(illustration.tags) { tag in
                         Button("#\(tag.displayName)") {
                             localBlocks.block(tag: tag)
@@ -88,15 +88,15 @@ struct ArtworkCard: View {
                 }
             }
         }
-        .alert("下载", isPresented: downloadNoticeBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Download", isPresented: downloadNoticeBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(downloadNotice ?? "未知状态")
+            Text(downloadNotice ?? "Unknown status")
         }
     }
 
     private var downloadTitle: String {
-        illustration.pageCount > 1 ? "下载全部图片" : "下载图片"
+        illustration.pageCount > 1 ? "Download All Images" : "Download Image"
     }
 
     private var route: AppRoute {

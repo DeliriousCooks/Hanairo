@@ -29,9 +29,9 @@ private enum PhotoLibrarySaveError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .permissionDenied:
-            "没有相册写入权限，请前往系统设置允许 Hanairo 添加照片。"
+            "Hanairo doesn't have permission to add photos. Please allow it in Settings."
         case .unsupportedPlatform:
-            "当前平台不支持保存到相册。"
+            "Saving to the photo library isn't supported on this platform."
         }
     }
 }

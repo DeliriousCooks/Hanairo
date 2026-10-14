@@ -53,7 +53,7 @@ struct UserRow: View {
             }
             .contextMenu {
                 Button(
-                    "屏蔽作者",
+                    "Block Artist",
                     systemImage: "person.crop.circle.badge.minus",
                     role: .destructive
                 ) {

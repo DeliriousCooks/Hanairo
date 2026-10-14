@@ -35,7 +35,7 @@ struct ArtworkViewerChrome: View {
     private var pageIndicatorContent: some View {
         HStack(spacing: 6) {
             if isZoomed {
-                Label("双击还原", systemImage: "magnifyingglass")
+                Label("Double-tap to reset", systemImage: "magnifyingglass")
                     .font(.caption.weight(.medium))
             }
 
@@ -55,7 +55,7 @@ struct ArtworkViewerChrome: View {
                                 .frame(width: 24, height: 32)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("第 \(page + 1) 页")
+                        .accessibilityLabel("Page \(page + 1)")
                         .accessibilityAddTraits(page == currentPage ? .isSelected : [])
                     }
                 }

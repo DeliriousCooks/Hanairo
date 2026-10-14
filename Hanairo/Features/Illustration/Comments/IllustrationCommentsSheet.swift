@@ -22,7 +22,7 @@ struct IllustrationCommentsSheet: View {
                 .toolbar {
                     if allowsPosting {
                         ToolbarItem(placement: .primaryAction) {
-                            Button("写评论", systemImage: "square.and.pencil") {
+                            Button("Write a Comment", systemImage: "square.and.pencil") {
                                 composerContext = .artwork
                             }
                             .labelStyle(.iconOnly)
@@ -30,7 +30,7 @@ struct IllustrationCommentsSheet: View {
                     }
 
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("关闭", systemImage: "xmark") {
+                        Button("Close", systemImage: "xmark") {
                             dismiss()
                         }
                         .labelStyle(.iconOnly)
@@ -52,12 +52,12 @@ struct IllustrationCommentsSheet: View {
             CommentComposerSheet(illustrationID: illustrationID, context: context)
                 .presentationDetents([.medium])
         }
-        .alert("刷新失败", isPresented: refreshErrorBinding) {
-            Button("好", role: .cancel) {
+        .alert("Refresh Failed", isPresented: refreshErrorBinding) {
+            Button("OK", role: .cancel) {
                 comments.clearRefreshError()
             }
         } message: {
-            Text(comments.refreshError ?? "未知错误")
+            Text(comments.refreshError ?? "Unknown error")
         }
     }
 
@@ -65,7 +65,7 @@ struct IllustrationCommentsSheet: View {
     private var content: some View {
         switch comments.phase {
         case .idle, .loading:
-            ProgressView("正在加载评论…")
+            ProgressView("Loading comments…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case let .failed(message):
             ErrorStateView(message: message) {
@@ -73,7 +73,7 @@ struct IllustrationCommentsSheet: View {
             }
         case .loaded:
             if visibleComments.isEmpty && comments.nextURL == nil {
-                ContentUnavailableView("暂无评论", systemImage: "text.bubble")
+                ContentUnavailableView("No Comments Yet", systemImage: "text.bubble")
             } else {
                 commentsList
             }
@@ -125,7 +125,7 @@ struct IllustrationCommentsSheet: View {
     }
 
     private var navigationTitle: String {
-        totalComments > 0 ? "评论 \(totalComments)" : "评论"
+        totalComments > 0 ? "Comments \(totalComments)" : "Comments"
     }
 
     private var requestKey: String {

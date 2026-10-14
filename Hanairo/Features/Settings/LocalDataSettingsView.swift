@@ -12,9 +12,9 @@ struct LocalDataSettingsView: View {
 
         Form {
             Section {
-                Toggle("记录浏览历史", isOn: $settings.recordsBrowsingHistory)
+                Toggle("Record Browsing History", isOn: $settings.recordsBrowsingHistory)
                 Stepper(
-                    "最多保留 \(settings.browsingHistoryLimit) 条",
+                    "Keep up to \(settings.browsingHistoryLimit) entries",
                     value: $settings.browsingHistoryLimit,
                     in: AppSettings.browsingHistoryLimitRange,
                     step: 50
@@ -23,39 +23,39 @@ struct LocalDataSettingsView: View {
                     history.applyCurrentLimit()
                 }
                 NavigationLink(value: AppRoute.browsingHistory) {
-                    LabeledContent("管理浏览历史", value: "\(history.entries.count)")
+                    LabeledContent("Manage Browsing History", value: "\(history.entries.count)")
                 }
-                Button("清空浏览历史", systemImage: "trash", role: .destructive) {
+                Button("Clear Browsing History", systemImage: "trash", role: .destructive) {
                     showsClearHistoryConfirmation = true
                 }
                 .disabled(history.entries.isEmpty)
             } header: {
-                Text("浏览历史")
+                Text("Browsing History")
             } footer: {
-                Text("历史仅保存在本机，不会同步到 Pixiv。关闭记录后不会自动删除现有历史。")
+                Text("History is stored only on this device and isn't synced to Pixiv. Turning off recording doesn't delete existing history.")
             }
 
             Section {
                 NavigationLink {
                     LocalBlockSettingsView()
                 } label: {
-                    LabeledContent("管理屏蔽内容", value: "\(localBlocks.totalCount)")
+                    LabeledContent("Manage Blocked Content", value: "\(localBlocks.totalCount)")
                 }
             } header: {
-                Text("本地屏蔽")
+                Text("Local Blocks")
             } footer: {
-                Text("本地屏蔽不会修改 Pixiv 账户，只影响 Hanairo 内显示的作品与作者。")
+                Text("Local blocks don't change your Pixiv account. They only affect which artworks and artists are shown in Hanairo.")
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("历史与屏蔽")
+        .navigationTitle("History & Blocks")
         .confirmationDialog(
-            "清空全部浏览历史？",
+            "Clear all browsing history?",
             isPresented: $showsClearHistoryConfirmation,
             titleVisibility: .visible
         ) {
-            Button("清空", role: .destructive) { history.clear() }
-            Button("取消", role: .cancel) {}
+            Button("Clear", role: .destructive) { history.clear() }
+            Button("Cancel", role: .cancel) {}
         }
     }
 }

@@ -7,8 +7,8 @@ struct AppearanceSettingsView: View {
         @Bindable var settings = settings
 
         Form {
-            Section("显示") {
-                Picker("显示模式", selection: $settings.appearance) {
+            Section("Display") {
+                Picker("Appearance", selection: $settings.appearance) {
                     ForEach(AppAppearance.allCases) { appearance in
                         Text(appearance.title).tag(appearance)
                     }
@@ -16,7 +16,7 @@ struct AppearanceSettingsView: View {
             }
 
             Section {
-                LabeledContent("渐隐位置") {
+                LabeledContent("Fade Position") {
                     Text(
                         settings.profileBackgroundScreenRatio,
                         format: .percent.precision(.fractionLength(0))
@@ -29,44 +29,44 @@ struct AppearanceSettingsView: View {
                     in: AppSettings.profileBackgroundScreenRatioRange,
                     step: 0.05
                 ) {
-                    Text("背景显示区域")
+                    Text("Background Area")
                 } minimumValueLabel: {
-                    Text("短")
+                    Text("Short")
                 } maximumValueLabel: {
-                    Text("长")
+                    Text("Long")
                 }
             } header: {
-                Text("作者主页背景")
+                Text("Artist Profile Background")
             } footer: {
-                Text("设置背景图在屏幕高度的哪个位置完全渐隐。")
+                Text("Sets where the background image fully fades out relative to screen height.")
             }
 
             Section {
-                Picker("详情画质", selection: $settings.imageQuality) {
+                Picker("Detail Quality", selection: $settings.imageQuality) {
                     ForEach(ArtworkImageQuality.allCases) { quality in
                         Text(quality.title).tag(quality)
                     }
                 }
             } header: {
-                Text("图片")
+                Text("Images")
             } footer: {
-                Text("画质设置会应用到之后加载的作品图片，已缓存内容不会重复下载。")
+                Text("Quality settings apply to artwork images loaded from now on. Cached content won't be downloaded again.")
             }
 
             Section {
-                Toggle("视差滚动", isOn: $settings.artworkParallaxEnabled)
+                Toggle("Parallax Scrolling", isOn: $settings.artworkParallaxEnabled)
             } header: {
-                Text("作品详情")
+                Text("Artwork Details")
             } footer: {
-                Text("开启后，信息卡片出现时图片会产生视差并渐隐到页面背景；关闭后图片按普通顺序排列。")
+                Text("When on, images shift with a parallax effect and fade into the page background as the info card appears. When off, images are laid out normally.")
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("外观与图片")
+        .navigationTitle("Appearance & Images")
     }
 }
 
-#Preview("外观与图片") {
+#Preview("Appearance & Images") {
     NavigationStack {
         AppearanceSettingsView()
     }

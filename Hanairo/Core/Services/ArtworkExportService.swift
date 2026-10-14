@@ -134,7 +134,7 @@ enum ArtworkExportService {
             .components(separatedBy: invalid)
             .joined(separator: "_")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalized = cleaned.isEmpty ? "未命名作品" : cleaned
+        let normalized = cleaned.isEmpty ? "Untitled Artwork" : cleaned
         return "\(id)_\(String(normalized.prefix(80)))"
     }
 

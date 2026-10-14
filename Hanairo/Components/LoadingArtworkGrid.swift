@@ -2,7 +2,7 @@ import SwiftUI
 
 struct LoadingArtworkGrid: View {
     var body: some View {
-        ProgressView("正在加载作品…")
+        ProgressView("Loading artworks…")
             .frame(maxWidth: .infinity, minHeight: 320)
     }
 }

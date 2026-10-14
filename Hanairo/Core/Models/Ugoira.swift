@@ -59,10 +59,10 @@ enum UgoiraLoadingStage: Equatable {
 
     var title: String {
         switch self {
-        case .metadata: "正在获取动图信息…"
-        case .downloading: "正在下载动图…"
-        case .extracting: "正在解压动图…"
-        case .decodingFirstFrame: "正在准备播放…"
+        case .metadata: "Fetching ugoira info…"
+        case .downloading: "Downloading ugoira…"
+        case .extracting: "Extracting ugoira…"
+        case .decodingFirstFrame: "Preparing playback…"
         }
     }
 }
@@ -80,21 +80,21 @@ nonisolated enum UgoiraError: LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .missingArchiveURL:
-            "Pixiv 没有返回可用的动图文件"
+            "Pixiv didn't return a usable ugoira file"
         case .emptyFrames:
-            "动图不包含任何帧"
+            "The ugoira contains no frames"
         case .invalidArchive:
-            "动图压缩包已损坏"
+            "The ugoira archive is corrupted"
         case .encryptedArchive:
-            "暂不支持加密的动图压缩包"
+            "Encrypted ugoira archives aren't supported"
         case let .unsupportedCompression(method):
-            "动图使用了不支持的压缩方式（\(method)）"
+            "The ugoira uses an unsupported compression method (\(method))"
         case let .missingFrame(filename):
-            "动图缺少帧：\(filename)"
+            "Ugoira is missing frame: \(filename)"
         case let .invalidFrame(filename):
-            "动图帧无法读取：\(filename)"
+            "Couldn't read ugoira frame: \(filename)"
         case .archiveTooLarge:
-            "动图文件过大，无法安全加载"
+            "The ugoira file is too large to load safely"
         }
     }
 }

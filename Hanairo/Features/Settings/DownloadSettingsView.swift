@@ -11,15 +11,15 @@ struct DownloadSettingsView: View {
 
         Form {
             Section {
-                Picker("默认保存位置", selection: $settings.downloadDestination) {
+                Picker("Default Save Location", selection: $settings.downloadDestination) {
                     ForEach(ArtworkDownloadDestination.allCases) { destination in
                         Text(destination.title).tag(destination)
                     }
                 }
             } header: {
-                Text("保存位置")
+                Text("Save Location")
             } footer: {
-                Text("相册会在任务完成一页后直接写入照片；文件会保存到系统文件中的 Hanairo Downloads，并可在下载详情中逐页导出。")
+                Text("The photo library saves each page as soon as it finishes. Files are saved to Hanairo Downloads in the Files app and can be exported page by page from the download details.")
             }
 
             Section {
@@ -27,29 +27,29 @@ struct DownloadSettingsView: View {
                     value: $settings.downloadConcurrentTaskCount,
                     in: AppSettings.downloadConcurrentTaskRange
                 ) {
-                    LabeledContent("同时任务数", value: "\(settings.downloadConcurrentTaskCount)")
+                    LabeledContent("Concurrent Tasks", value: "\(settings.downloadConcurrentTaskCount)")
                 }
 
                 Stepper(
                     value: $settings.downloadRetryCount,
                     in: AppSettings.downloadRetryRange
                 ) {
-                    LabeledContent("失败重试", value: "\(settings.downloadRetryCount) 次")
+                    LabeledContent("Retries on Failure", value: "\(settings.downloadRetryCount) times")
                 }
 
-                Toggle("优先读取图片缓存", isOn: $settings.downloadReadsImageCache)
-                Toggle("下载时自动收藏", isOn: $settings.bookmarksOnDownload)
+                Toggle("Prefer Image Cache", isOn: $settings.downloadReadsImageCache)
+                Toggle("Bookmark on Download", isOn: $settings.bookmarksOnDownload)
             } header: {
-                Text("任务")
+                Text("Tasks")
             } footer: {
-                Text("自动收藏会使用默认收藏范围。正在运行的任务会在每页结束后响应暂停；应用重启后，未完成任务会恢复到等待状态。")
+                Text("Auto-bookmark uses the default bookmark visibility. Running tasks pause after the current page finishes. After the app restarts, unfinished tasks return to the waiting state.")
             }
 
-            Section("下载管理") {
-                LabeledContent("下载记录", value: "\(downloadManager.records.count) 个")
+            Section("Download Management") {
+                LabeledContent("Download Records", value: "\(downloadManager.records.count)")
                 if let storageUsage {
                     LabeledContent(
-                        "本地占用",
+                        "Local Storage Used",
                         value: ByteCountFormatter.string(
                             fromByteCount: storageUsage.totalBytes,
                             countStyle: .file
@@ -59,7 +59,7 @@ struct DownloadSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("下载")
+        .navigationTitle("Downloads")
         .task(id: usageRequestKey) {
             storageUsage = await downloadManager.storageUsage()
         }
@@ -70,7 +70,7 @@ struct DownloadSettingsView: View {
     }
 }
 
-#Preview("下载") {
+#Preview("Downloads") {
     NavigationStack {
         DownloadSettingsView()
     }

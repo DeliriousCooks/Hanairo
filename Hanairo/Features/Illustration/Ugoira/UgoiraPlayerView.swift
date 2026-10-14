@@ -66,7 +66,7 @@ struct UgoiraPlayerView: View {
             }
         }
         .overlay(alignment: .topLeading) {
-            Label("动图", systemImage: "play.rectangle.fill")
+            Label("Ugoira", systemImage: "play.rectangle.fill")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 9)
@@ -77,7 +77,7 @@ struct UgoiraPlayerView: View {
     }
 
     private var playButton: some View {
-        Button("播放动图", systemImage: "play.fill") {
+        Button("Play Ugoira", systemImage: "play.fill") {
             loadRequestID = UUID()
         }
         .labelStyle(.iconOnly)
@@ -86,7 +86,7 @@ struct UgoiraPlayerView: View {
         .frame(width: 58, height: 58)
         .background(.black.opacity(0.58), in: Circle())
         .buttonStyle(.plain)
-        .accessibilityHint("下载并播放 Ugoira")
+        .accessibilityHint("Download and play ugoira")
     }
 
     private func loadingOverlay(_ stage: UgoiraLoadingStage) -> some View {
@@ -109,7 +109,7 @@ struct UgoiraPlayerView: View {
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
-            Button("重新加载", systemImage: "arrow.clockwise") {
+            Button("Reload", systemImage: "arrow.clockwise") {
                 loadRequestID = UUID()
             }
             .buttonStyle(.borderedProminent)

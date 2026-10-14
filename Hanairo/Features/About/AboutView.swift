@@ -18,7 +18,7 @@ struct AboutView: View {
                         .foregroundStyle(Color.accentColor.gradient)
                     Text("Hanairo")
                         .font(.title.weight(.bold))
-                    Text("版本 \(version)")
+                    Text("Version \(version)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -34,7 +34,7 @@ struct AboutView: View {
                 } label: {
                     HStack {
                         Label(
-                            isCheckingUpdate ? "正在检查更新" : "检查更新",
+                            isCheckingUpdate ? "Checking for Updates" : "Check for Updates",
                             systemImage: "arrow.triangle.2.circlepath"
                         )
                         Spacer()
@@ -45,32 +45,32 @@ struct AboutView: View {
                 }
                 .disabled(isCheckingUpdate)
 
-                Toggle("启动时检查更新", isOn: $settings.checksUpdatesOnLaunch)
+                Toggle("Check for Updates on Launch", isOn: $settings.checksUpdatesOnLaunch)
             } header: {
-                Text("更新")
+                Text("Updates")
             } footer: {
-                Text("自动检查只会在发现新版本时提示，检查失败不会打断启动。")
+                Text("Automatic checks only notify you when a new version is found. A failed check won't interrupt launch.")
             }
 
-            Section("说明") {
-                Text("Hanairo 使用 SwiftUI 与系统框架构建，是面向 Pixiv 的第三方客户端。")
-                Text("Pixiv、pixiv 及相关标志归 pixiv Inc. 所有。")
+            Section("About This App") {
+                Text("Hanairo is a third-party Pixiv client built with SwiftUI and system frameworks.")
+                Text("Pixiv, pixiv, and related logos are property of pixiv Inc.")
             }
 
-            Section("开源许可") {
-                Text("Hanairo 依据 Mozilla Public License 2.0（MPL-2.0）发布。")
+            Section("Open Source License") {
+                Text("Hanairo is released under the Mozilla Public License 2.0 (MPL-2.0).")
                 Link(destination: AppUpdateService.repositoryURL) {
-                    Label("开源地址", systemImage: "chevron.left.forwardslash.chevron.right")
+                    Label("Source Code", systemImage: "chevron.left.forwardslash.chevron.right")
                 }
                 Link(destination: URL(string: "https://www.mozilla.org/MPL/2.0/")!) {
-                    Label("查看 MPL 2.0", systemImage: "doc.text")
+                    Label("View MPL 2.0", systemImage: "doc.text")
                 }
             }
 
-            Section("社区") {
+            Section("Community") {
                 Link(destination: URL(string: "https://t.me/hanairo_official")!) {
                     HStack {
-                        Label("Telegram 群组", systemImage: "paperplane")
+                        Label("Telegram Group", systemImage: "paperplane")
                         Spacer()
                         Text("@hanairo_official")
                             .foregroundStyle(.secondary)
@@ -78,29 +78,29 @@ struct AboutView: View {
                 }
             }
 
-            Section("致谢") {
-                Text("功能结构参考了 PixEz Flutter 项目。")
+            Section("Acknowledgements") {
+                Text("Feature structure was inspired by the PixEz Flutter project.")
                 Link(destination: URL(string: "https://github.com/Notsfsssf/pixez-flutter")!) {
                     Label("PixEz Flutter", systemImage: "arrow.up.right.square")
                 }
             }
         }
-        .navigationTitle("关于")
+        .navigationTitle("About")
         .alert(item: $updateAlert) { alert in
             if let releaseURL = alert.releaseURL {
                 Alert(
                     title: Text(alert.title),
                     message: Text(alert.message),
-                    primaryButton: .default(Text("打开发布页")) {
+                    primaryButton: .default(Text("Open Releases Page")) {
                         openURL(releaseURL)
                     },
-                    secondaryButton: .cancel(Text("好"))
+                    secondaryButton: .cancel(Text("OK"))
                 )
             } else {
                 Alert(
                     title: Text(alert.title),
                     message: Text(alert.message),
-                    dismissButton: .default(Text("好"))
+                    dismissButton: .default(Text("OK"))
                 )
             }
         }
@@ -121,20 +121,20 @@ struct AboutView: View {
             let result = try await AppUpdateService.checkLatestRelease(currentVersion: version)
             if result.hasUpdate {
                 updateAlert = UpdateAlert(
-                    title: "发现新版本",
-                    message: "当前版本 \(result.currentVersion)，最新版本 \(result.latestVersion)。可以前往发布页查看更新内容。",
+                    title: "New Version Available",
+                    message: "Current version: \(result.currentVersion). Latest version: \(result.latestVersion). You can view what's new on the releases page.",
                     releaseURL: result.releaseURL
                 )
             } else {
                 updateAlert = UpdateAlert(
-                    title: "已是最新版本",
-                    message: "当前版本 \(result.currentVersion) 已是最新版本。",
+                    title: "You're Up to Date",
+                    message: "Version \(result.currentVersion) is the latest version.",
                     releaseURL: nil
                 )
             }
         } catch {
             updateAlert = UpdateAlert(
-                title: "检查更新失败",
+                title: "Update Check Failed",
                 message: error.localizedDescription,
                 releaseURL: nil
             )

@@ -45,15 +45,15 @@ struct ArtworkViewerView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
                 }
             }
-            .navigationTitle(title.isEmpty ? "查看大图" : title)
+            .navigationTitle(title.isEmpty ? "View Full Size" : title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭", systemImage: "xmark") {
+                    Button("Close", systemImage: "xmark") {
                         dismiss()
                     }
                     .labelStyle(.iconOnly)
-                    .accessibilityLabel("关闭大图")
+                    .accessibilityLabel("Close full size view")
                 }
 
                 ToolbarItemGroup(placement: .primaryAction) {
@@ -74,7 +74,7 @@ struct ArtworkViewerView: View {
                             }
                         }
                         .disabled(urls[selectedPage] == nil || isPreparingDownload)
-                        .accessibilityLabel(isPreparingDownload ? "正在准备下载" : "下载当前图片")
+                        .accessibilityLabel(isPreparingDownload ? "Preparing download" : "Download current image")
                     }
                     shareAction
                 }
@@ -86,10 +86,10 @@ struct ArtworkViewerView: View {
         .background(Color.black)
         .presentationBackground(.black)
         .environment(\.colorScheme, .dark)
-        .alert("下载任务", isPresented: downloadNoticeBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Download Task", isPresented: downloadNoticeBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(downloadNotice ?? "未知状态")
+            Text(downloadNotice ?? "Unknown status")
         }
         .onChange(of: selectedPage) {
             isCurrentPageZoomed = false
@@ -104,9 +104,9 @@ struct ArtworkViewerView: View {
             ShareLink(item: currentURL) {
                 Image(systemName: "square.and.arrow.up")
             }
-            .accessibilityLabel("分享当前图片")
+            .accessibilityLabel("Share current image")
         } else {
-            Button("图片不可用", systemImage: "square.and.arrow.up") {}
+            Button("Image Unavailable", systemImage: "square.and.arrow.up") {}
                 .labelStyle(.iconOnly)
                 .disabled(true)
         }

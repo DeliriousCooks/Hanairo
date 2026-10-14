@@ -24,11 +24,11 @@ struct RemoteImageView: View {
                         .transition(.opacity)
                 } else if didFail {
                     Color.gray.opacity(0.28)
-                        .accessibilityLabel("图片加载失败")
+                        .accessibilityLabel("Image failed to load")
                 } else {
                     ProgressView()
                         .controlSize(.small)
-                        .accessibilityLabel("正在加载图片")
+                        .accessibilityLabel("Loading image")
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)

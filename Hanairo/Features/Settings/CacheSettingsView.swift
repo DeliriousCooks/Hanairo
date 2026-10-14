@@ -14,7 +14,7 @@ struct CacheSettingsView: View {
     @State private var activeClear: CacheClearTarget?
 
     private var totalUsageText: String {
-        guard let imageUsage, let detailUsage, let ugoiraUsage else { return "计算中…" }
+        guard let imageUsage, let detailUsage, let ugoiraUsage else { return "Calculating…" }
         return CacheByteCountFormatter.string(
             imageUsage.byteCount + detailUsage.byteCount + ugoiraUsage.byteCount
         )
@@ -34,40 +34,40 @@ struct CacheSettingsView: View {
         @Bindable var settings = settings
 
         Form {
-            Section("总览") {
-                LabeledContent("缓存总占用", value: totalUsageText)
+            Section("Overview") {
+                LabeledContent("Total Cache Usage", value: totalUsageText)
             }
 
             Section {
                 CacheUsageRows(usage: imageUsage)
 
                 Stepper(
-                    "最大容量：\(settings.imageCacheLimitMB) MB",
+                    "Max size: \(settings.imageCacheLimitMB) MB",
                     value: $settings.imageCacheLimitMB,
                     in: AppSettings.imageCacheLimitRange,
                     step: 50
                 )
 
                 CacheClearButton(
-                    title: "清空图片缓存",
+                    title: "Clear Image Cache",
                     isWorking: isClearing(.images),
                     isDisabled: activeClear != nil
                 ) {
                     requestClear(.images)
                 }
             } header: {
-                Text("图片缓存")
+                Text("Image Cache")
             } footer: {
-                Text("封面和作品图片会优先使用磁盘缓存；超过容量后会自动删除最久未使用的文件。清理时也会释放内存图片。")
+                Text("Thumbnails and artwork images use the disk cache first. When the size limit is exceeded, the least recently used files are deleted automatically. Clearing also frees images held in memory.")
             }
 
             Section {
-                Toggle("启用作品详情缓存", isOn: $settings.detailCacheEnabled)
+                Toggle("Enable Artwork Details Cache", isOn: $settings.detailCacheEnabled)
 
                 CacheUsageRows(usage: detailUsage)
 
                 Stepper(
-                    "最大容量：\(settings.detailCacheLimitMB) MB",
+                    "Max size: \(settings.detailCacheLimitMB) MB",
                     value: $settings.detailCacheLimitMB,
                     in: AppSettings.detailCacheLimitRange,
                     step: 5
@@ -75,44 +75,44 @@ struct CacheSettingsView: View {
                 .disabled(!settings.detailCacheEnabled)
 
                 CacheClearButton(
-                    title: "清空作品详情缓存",
+                    title: "Clear Artwork Details Cache",
                     isWorking: isClearing(.details),
                     isDisabled: activeClear != nil
                 ) {
                     requestClear(.details)
                 }
             } header: {
-                Text("作品详情缓存")
+                Text("Artwork Details Cache")
             } footer: {
-                Text("开启后，再次打开作品时会先显示本地详情，再从 Pixiv 更新最新数据。关闭不会自动删除已有缓存。")
+                Text("When on, reopening an artwork shows local details first, then updates from Pixiv. Turning this off doesn't delete the existing cache.")
             }
 
             Section {
                 CacheUsageRows(usage: ugoiraUsage)
 
                 Stepper(
-                    "最大容量：\(settings.ugoiraCacheLimitMB) MB",
+                    "Max size: \(settings.ugoiraCacheLimitMB) MB",
                     value: $settings.ugoiraCacheLimitMB,
                     in: AppSettings.ugoiraCacheLimitRange,
                     step: 50
                 )
 
                 CacheClearButton(
-                    title: "清空动图缓存",
+                    title: "Clear Ugoira Cache",
                     isWorking: isClearing(.ugoira),
                     isDisabled: activeClear != nil
                 ) {
                     requestClear(.ugoira)
                 }
             } header: {
-                Text("动图缓存")
+                Text("Ugoira Cache")
             } footer: {
-                Text("Ugoira 原始压缩包会保存在本地，再次播放时无需重复下载；超过容量后会自动清理最久未使用的文件。")
+                Text("Original ugoira archives are stored locally so they don't need to be downloaded again. When the size limit is exceeded, the least recently used files are cleaned up automatically.")
             }
 
-            Section("清理") {
+            Section("Clean Up") {
                 CacheClearButton(
-                    title: "清空所有缓存",
+                    title: "Clear All Caches",
                     isWorking: activeClear == .all,
                     isDisabled: activeClear != nil
                 ) {
@@ -121,7 +121,7 @@ struct CacheSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("缓存")
+        .navigationTitle("Cache")
         .task {
             await prepareAndRefreshUsage()
         }
@@ -138,7 +138,7 @@ struct CacheSettingsView: View {
             applyUgoiraCacheCapacity()
         }
         .confirmationDialog(
-            pendingClear?.confirmationTitle ?? "清空缓存？",
+            pendingClear?.confirmationTitle ?? "Clear cache?",
             isPresented: showsClearConfirmation,
             titleVisibility: .visible,
             presenting: pendingClear
@@ -146,7 +146,7 @@ struct CacheSettingsView: View {
             Button(target.actionTitle, role: .destructive) {
                 performClear(target)
             }
-            Button("取消", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: { target in
             Text(target.message)
         }
@@ -233,12 +233,12 @@ private struct CacheUsageRows: View {
     var body: some View {
         if let usage {
             LabeledContent(
-                "当前占用",
+                "Current Usage",
                 value: CacheByteCountFormatter.string(usage.byteCount)
             )
-            LabeledContent("缓存项目", value: "\(usage.itemCount) 项")
+            LabeledContent("Cached Items", value: "\(usage.itemCount) items")
             ProgressView(value: usage.fraction) {
-                Text("容量使用")
+                Text("Capacity Used")
             } currentValueLabel: {
                 Text(
                     "\(CacheByteCountFormatter.string(usage.byteCount)) / "
@@ -249,7 +249,7 @@ private struct CacheUsageRows: View {
         } else {
             HStack(spacing: 10) {
                 ProgressView()
-                Text("正在计算占用…")
+                Text("Calculating usage…")
                     .foregroundStyle(.secondary)
             }
         }
@@ -267,7 +267,7 @@ private struct CacheClearButton: View {
             if isWorking {
                 HStack(spacing: 10) {
                     ProgressView()
-                    Text("正在清理…")
+                    Text("Clearing…")
                 }
             } else {
                 Label(title, systemImage: "trash")
@@ -285,32 +285,32 @@ private enum CacheClearTarget: Equatable {
 
     var confirmationTitle: String {
         switch self {
-        case .images: "清空图片缓存？"
-        case .details: "清空作品详情缓存？"
-        case .ugoira: "清空动图缓存？"
-        case .all: "清空所有缓存？"
+        case .images: "Clear image cache?"
+        case .details: "Clear artwork details cache?"
+        case .ugoira: "Clear ugoira cache?"
+        case .all: "Clear all caches?"
         }
     }
 
     var actionTitle: String {
         switch self {
-        case .images: "清空图片缓存"
-        case .details: "清空详情缓存"
-        case .ugoira: "清空动图缓存"
-        case .all: "全部清空"
+        case .images: "Clear Image Cache"
+        case .details: "Clear Details Cache"
+        case .ugoira: "Clear Ugoira Cache"
+        case .all: "Clear All"
         }
     }
 
     var message: String {
         switch self {
         case .images:
-            "将删除缓存的封面和作品图片，不影响已经保存到相册或文件的图片。"
+            "This deletes cached thumbnails and artwork images. Images already saved to the photo library or Files aren't affected."
         case .details:
-            "将删除本地作品详情，下次打开时会重新从 Pixiv 获取。"
+            "This deletes locally stored artwork details. They'll be fetched from Pixiv again the next time you open them."
         case .ugoira:
-            "将删除本地 Ugoira 压缩包，下次播放时会重新下载。"
+            "This deletes locally stored ugoira archives. They'll be downloaded again the next time you play them."
         case .all:
-            "将删除图片、动图与作品详情缓存，不影响登录状态、收藏或已经下载的文件。"
+            "This deletes the image, ugoira, and artwork details caches. Your sign-in status, bookmarks, and downloaded files aren't affected."
         }
     }
 }
@@ -321,7 +321,7 @@ private nonisolated enum CacheByteCountFormatter {
     }
 }
 
-#Preview("缓存") {
+#Preview("Cache") {
     NavigationStack {
         CacheSettingsView()
     }

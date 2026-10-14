@@ -18,7 +18,7 @@ struct DiscoveryView: View {
         GeometryReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 20) {
-                    Picker("作品类型", selection: $kind) {
+                    Picker("Artwork Type", selection: $kind) {
                         ForEach(PixivAPI.RecommendationKind.allCases) { item in
                             Text(item.title).tag(item)
                         }
@@ -39,10 +39,10 @@ struct DiscoveryView: View {
         .refreshable {
             await refresh()
         }
-        .alert("操作失败", isPresented: actionErrorBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Action Failed", isPresented: actionErrorBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(displayedError ?? "未知错误")
+            Text(displayedError ?? "Unknown error")
         }
     }
 
@@ -50,7 +50,7 @@ struct DiscoveryView: View {
     private var recommendedUserSection: some View {
         switch recommendedUsers.phase {
         case .idle, .loading:
-            ProgressView("正在发现作者…")
+            ProgressView("Finding artists…")
                 .frame(maxWidth: .infinity, minHeight: 72)
         case .failed:
             EmptyView()
@@ -80,7 +80,7 @@ struct DiscoveryView: View {
             .frame(minHeight: 360)
         case .loaded:
             if visibleFeedItems.isEmpty {
-                ContentUnavailableView("暂无推荐", systemImage: "sparkles")
+                ContentUnavailableView("No Recommendations", systemImage: "sparkles")
                     .frame(minHeight: 360)
             } else {
                 if usesWideLayout(for: availableWidth + 32) {
@@ -88,7 +88,7 @@ struct DiscoveryView: View {
                 } else {
                     featuredArtwork
                     recommendedUserSection
-                    Text("更多推荐")
+                    Text("More Recommendations")
                         .font(.title2.weight(.bold))
                     ArtworkMasonryGrid(
                         illustrations: Array(visibleFeedItems.dropFirst()),
@@ -192,17 +192,17 @@ struct DiscoveryView: View {
 
             switch recommendedUsers.phase {
             case .idle, .loading:
-                ProgressView("正在发现作者…")
+                ProgressView("Finding artists…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .failed:
                 ContentUnavailableView(
-                    "推荐作者暂不可用",
+                    "Recommended Artists Unavailable",
                     systemImage: "person.2.slash"
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .loaded:
                 if visibleRecommendedUsers.isEmpty {
-                    ContentUnavailableView("暂无推荐作者", systemImage: "person.2")
+                    ContentUnavailableView("No Recommended Artists", systemImage: "person.2")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     let columnCount = recommendedUserColumnCount(for: width)
@@ -229,10 +229,10 @@ struct DiscoveryView: View {
 
     private var recommendedUserHeader: some View {
         HStack {
-            Text("推荐作者")
+            Text("Recommended Artists")
                 .font(.title3.weight(.bold))
             Spacer()
-            NavigationLink("查看全部", value: AppRoute.recommendedUsers)
+            NavigationLink("See All", value: AppRoute.recommendedUsers)
                 .font(.subheadline)
         }
     }
@@ -263,7 +263,7 @@ struct DiscoveryView: View {
                     .clipped()
                     .appNavigationTransitionSource(for: .user(id: id))
                 }
-                .accessibilityLabel("我的主页")
+                .accessibilityLabel("My profile")
             }
         }
     }
@@ -479,7 +479,7 @@ private struct FeaturedArtworkView: View {
             .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 5) {
-                Text("今日灵感")
+                Text("Today's Inspiration")
                     .font(.caption.weight(.bold))
                     .textCase(.uppercase)
                     .foregroundStyle(.white.opacity(0.75))
@@ -528,7 +528,7 @@ private struct FeaturedArtworkView: View {
     }
 }
 
-#Preview("推荐预览") {
+#Preview("Discover Preview") {
     NavigationStack {
         DiscoveryView()
     }

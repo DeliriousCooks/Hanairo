@@ -8,20 +8,20 @@ struct ArtworkInformationSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("作品") {
-                    LabeledContent("标题", value: illustration.title)
-                    LabeledContent("作品 ID", value: String(illustration.id))
-                    LabeledContent("作者", value: illustration.user.name)
-                    LabeledContent("作者 ID", value: String(illustration.user.id))
-                    LabeledContent("页数", value: String(illustration.pageCount))
-                    LabeledContent("尺寸", value: "\(illustration.width) × \(illustration.height)")
+                Section("Artwork") {
+                    LabeledContent("Title", value: illustration.title)
+                    LabeledContent("Artwork ID", value: String(illustration.id))
+                    LabeledContent("Artist", value: illustration.user.name)
+                    LabeledContent("Artist ID", value: String(illustration.user.id))
+                    LabeledContent("Pages", value: String(illustration.pageCount))
+                    LabeledContent("Size", value: "\(illustration.width) × \(illustration.height)")
                     if !illustration.createDate.isEmpty {
-                        LabeledContent("发布日期", value: String(illustration.createDate.prefix(10)))
+                        LabeledContent("Publish Date", value: String(illustration.createDate.prefix(10)))
                     }
                 }
 
                 if !illustration.tags.isEmpty {
-                    Section("标签") {
+                    Section("Tags") {
                         Text(illustration.tags.map { "#\($0.displayName)" }.joined(separator: "  "))
                             .textSelection(.enabled)
                     }
@@ -29,27 +29,27 @@ struct ArtworkInformationSheet: View {
 
                 let caption = TextSanitizer.plainText(from: illustration.caption)
                 if !caption.isEmpty {
-                    Section("简介") {
+                    Section("Caption") {
                         Text(caption)
                             .textSelection(.enabled)
                     }
                 }
 
-                Section("分享") {
+                Section("Share") {
                     ShareLink(item: shareText) {
-                        Label("分享作品信息", systemImage: "doc.text")
+                        Label("Share Artwork Info", systemImage: "doc.text")
                     }
                     ShareLink(item: PixivWebLinks.artwork(id: illustration.id)) {
-                        Label("分享作品链接", systemImage: "link")
+                        Label("Share Artwork Link", systemImage: "link")
                     }
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("作品信息")
+            .navigationTitle("Artwork Info")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
+                    Button("Done") { dismiss() }
                 }
             }
         }
@@ -57,9 +57,9 @@ struct ArtworkInformationSheet: View {
 
     private var shareText: String {
         [
-            "标题：\(illustration.title)",
-            "作者：\(illustration.user.name)",
-            "作品 ID：\(illustration.id)",
+            "Title: \(illustration.title)",
+            "Artist: \(illustration.user.name)",
+            "Artwork ID: \(illustration.id)",
             PixivWebLinks.artwork(id: illustration.id).absoluteString
         ].joined(separator: "\n")
     }

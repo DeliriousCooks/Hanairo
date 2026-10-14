@@ -59,17 +59,17 @@ struct UgoiraViewerView: View {
     private var viewerContent: some View {
         switch player.phase {
         case .idle, .loading:
-            ProgressView("正在准备动图…")
+            ProgressView("Preparing ugoira…")
                 .tint(.white)
                 .foregroundStyle(.white)
         case let .failed(message):
             VStack(spacing: 14) {
                 ContentUnavailableView(
-                    "动图无法播放",
+                    "Ugoira Can't Be Played",
                     systemImage: "exclamationmark.triangle",
                     description: Text(message)
                 )
-                Button("重试", systemImage: "arrow.clockwise") {
+                Button("Retry", systemImage: "arrow.clockwise") {
                     preparationID = UUID()
                 }
                 .buttonStyle(.borderedProminent)
@@ -95,11 +95,11 @@ struct UgoiraViewerView: View {
     }
 
     private var closeButtonContent: some View {
-        Button("关闭", systemImage: "xmark") {
+        Button("Close", systemImage: "xmark") {
             dismiss()
         }
         .labelStyle(.iconOnly)
         .frame(width: 44, height: 44)
-        .accessibilityLabel("关闭动图")
+        .accessibilityLabel("Close ugoira")
     }
 }

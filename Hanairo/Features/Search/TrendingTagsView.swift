@@ -57,16 +57,16 @@ struct TrendingTagsView: View {
             }
             .buttonStyle(.plain)
             .contextMenu {
-                Button("查看大图", systemImage: "arrow.up.left.and.arrow.down.right") {
+                Button("View Full Size", systemImage: "arrow.up.left.and.arrow.down.right") {
                     previewTag = tag
                 }
                 .disabled(tag.illustration.imageURLs.fullSizeURL == nil)
 
-                Button("查看作品详情", systemImage: "info.circle") {
+                Button("View Artwork Details", systemImage: "info.circle") {
                     navigation.push(.illustration(id: tag.illustration.id))
                 }
 
-                Button("屏蔽此标签", systemImage: "number", role: .destructive) {
+                Button("Block This Tag", systemImage: "number", role: .destructive) {
                     localBlocks.blockTag(
                         name: tag.tag,
                         translatedName: tag.translatedName
@@ -95,7 +95,7 @@ struct TrendingTagsView: View {
                 pageIndices: [0]
             ).message
         } catch {
-            return "下载失败：\(error.localizedDescription)"
+            return "Download failed: \(error.localizedDescription)"
         }
     }
 

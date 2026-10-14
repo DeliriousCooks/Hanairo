@@ -33,19 +33,19 @@ nonisolated enum ArtworkExportError: LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .noAvailablePages:
-            "没有可导出的图片"
+            "There are no images to export"
         case let .missingPage(index):
-            "第 \(index + 1) 页没有可用的原图地址"
+            "Page \(index + 1) has no original image URL"
         case .cannotCreateOutput:
-            "无法创建导出文件"
+            "Couldn't create the export file"
         case let .invalidImage(index):
-            "第 \(index + 1) 页不是有效图片"
+            "Page \(index + 1) is not a valid image"
         case .invalidFilename:
-            "无法生成有效的压缩包文件名"
+            "Couldn't generate a valid archive file name"
         case .archiveTooLarge:
-            "作品过大，超出了 ZIP 格式支持的容量"
+            "The artwork is too large for the ZIP format"
         case .compressionFailed:
-            "压缩图片时发生错误"
+            "An error occurred while compressing images"
         }
     }
 }

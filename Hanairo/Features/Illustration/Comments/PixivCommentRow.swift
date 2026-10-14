@@ -57,7 +57,7 @@ struct PixivCommentRow: View {
         if let parent = comment.parentComment {
             VStack(alignment: .leading, spacing: 3) {
                 if let user = parent.user {
-                    Text("回复 \(user.name)")
+                    Text("Replying to \(user.name)")
                         .font(.caption.weight(.semibold))
                 }
                 if !parent.comment.isEmpty {
@@ -82,7 +82,7 @@ struct PixivCommentRow: View {
         } else if !comment.comment.isEmpty {
             PixivCommentText(content: comment.comment)
         } else {
-            Text("（无内容）")
+            Text("(No content)")
                 .font(.body)
                 .foregroundStyle(.secondary)
         }
@@ -91,16 +91,16 @@ struct PixivCommentRow: View {
     private var actions: some View {
         HStack(spacing: 16) {
             if let onReply {
-                Button("回复", systemImage: "arrowshape.turn.up.left", action: onReply)
+                Button("Reply", systemImage: "arrowshape.turn.up.left", action: onReply)
             }
             if let onShowReplies {
-                Button("查看回复", systemImage: "text.bubble", action: onShowReplies)
+                Button("View Replies", systemImage: "text.bubble", action: onShowReplies)
             }
             Menu { moreActions } label: {
                 Image(systemName: "ellipsis")
                     .frame(width: 28, height: 24)
             }
-            .accessibilityLabel("更多评论操作")
+            .accessibilityLabel("More comment actions")
         }
         .font(.caption.weight(.medium))
         .buttonStyle(.plain)
@@ -111,17 +111,17 @@ struct PixivCommentRow: View {
     private var moreActions: some View {
         if !comment.comment.isEmpty {
             ShareLink(item: comment.comment) {
-                Label("分享评论文字", systemImage: "square.and.arrow.up")
+                Label("Share Comment Text", systemImage: "square.and.arrow.up")
             }
         }
-        Button("隐藏此评论", systemImage: "eye.slash", role: .destructive) {
+        Button("Hide This Comment", systemImage: "eye.slash", role: .destructive) {
             localBlocks.block(comment: comment)
         }
-        Button("屏蔽该用户", systemImage: "person.crop.circle.badge.minus", role: .destructive) {
+        Button("Block This User", systemImage: "person.crop.circle.badge.minus", role: .destructive) {
             localBlocks.block(user: comment.user)
         }
         Link(destination: PixivWebLinks.artwork(id: illustrationID)) {
-            Label("前往 Pixiv 举报", systemImage: "exclamationmark.bubble")
+            Label("Report on Pixiv", systemImage: "exclamationmark.bubble")
         }
     }
 

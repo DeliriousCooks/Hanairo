@@ -73,7 +73,7 @@ struct IllustrationDetailView: View {
         Group {
             switch state {
             case .idle, .loading:
-                ProgressView("正在加载作品…")
+                ProgressView("Loading artworks…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case let .failed(message):
                 ErrorStateView(message: message) {
@@ -115,34 +115,34 @@ struct IllustrationDetailView: View {
 
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
-                        Button("作品信息", systemImage: "info.circle") {
+                        Button("Artwork Info", systemImage: "info.circle") {
                             informationArtwork = illustration
                         }
-                        Button("编辑收藏", systemImage: "tag") {
+                        Button("Edit Bookmark", systemImage: "tag") {
                             bookmarkEditor = illustration
                         }
                         Link(destination: PixivWebLinks.artwork(id: illustration.id)) {
-                            Label("在 Pixiv 打开", systemImage: "safari")
+                            Label("Open in Pixiv", systemImage: "safari")
                         }
                         if
                             let imageURL = illustration.originalPageURLs.compactMap({ $0 }).first,
                             let sauceURL = PixivWebLinks.sauceNAO(imageURL: imageURL)
                         {
                             Link(destination: sauceURL) {
-                                Label("使用 SauceNAO 搜图", systemImage: "photo.badge.magnifyingglass")
+                                Label("Search with SauceNAO", systemImage: "photo.badge.magnifyingglass")
                             }
                         }
                         Divider()
-                        Button("本地屏蔽…", systemImage: "hand.raised") {
+                        Button("Block Locally…", systemImage: "hand.raised") {
                             blockEditor = illustration
                         }
                         Link(destination: PixivWebLinks.artwork(id: illustration.id)) {
-                            Label("前往 Pixiv 举报", systemImage: "exclamationmark.bubble")
+                            Label("Report on Pixiv", systemImage: "exclamationmark.bubble")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
-                    .accessibilityLabel("更多操作")
+                    .accessibilityLabel("More actions")
                 }
             }
         }
@@ -155,15 +155,15 @@ struct IllustrationDetailView: View {
         .task(id: artworkThemeImageURL) {
             await updateArtworkAccent()
         }
-        .alert("操作失败", isPresented: actionErrorBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Action Failed", isPresented: actionErrorBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(actionError ?? "未知错误")
+            Text(actionError ?? "Unknown error")
         }
-        .alert("下载任务", isPresented: actionNoticeBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Download Task", isPresented: actionNoticeBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(actionNotice ?? "图片已保存")
+            Text(actionNotice ?? "Image saved")
         }
         .sheet(item: $commentSheet, onDismiss: refreshDetailAfterComments) { context in
             IllustrationCommentsSheet(
@@ -233,7 +233,7 @@ struct IllustrationDetailView: View {
         } else if isLoadingDetails {
             VStack(spacing: 12) {
                 ProgressView()
-                Text("正在加载作品信息…")
+                Text("Loading artwork info…")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -252,7 +252,7 @@ struct IllustrationDetailView: View {
         if case .loaded = state {
             return ""
         }
-        return "作品详情"
+        return "Artwork Details"
     }
 
     private var artworkThemeImageURL: URL? {
@@ -573,7 +573,7 @@ private struct RelatedArtworkSection: View {
 
     private var header: some View {
         HStack {
-            Text("相关作品")
+            Text("Related Artworks")
                 .font(.title2.weight(.bold))
             Spacer()
             if !store.items.isEmpty {
@@ -657,7 +657,7 @@ private struct RelatedArtworkSection: View {
     }
 }
 
-#Preview("作品详情") {
+#Preview("Artwork Details") {
     NavigationStack {
         IllustrationDetailView(illustrationID: 1004)
     }

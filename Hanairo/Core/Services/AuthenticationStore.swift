@@ -64,7 +64,7 @@ final class AuthenticationStore {
         } catch {
             self.credentials = nil
             account = nil
-            errorMessage = "无法恢复登录，请重新登录：\(error.localizedDescription)"
+            errorMessage = "Couldn't restore your session. Please sign in again: \(error.localizedDescription)"
         }
     }
 

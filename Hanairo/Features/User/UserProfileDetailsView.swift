@@ -24,7 +24,7 @@ struct UserProfileDetailsView: View {
         VStack(alignment: .leading, spacing: 14) {
             FloatingGlassCard {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("关于")
+                    Text("About")
                         .font(.title3.weight(.bold))
 
                     Text(profileComment)
@@ -83,7 +83,7 @@ struct UserProfileDetailsView: View {
             }
         } label: {
             HStack {
-                Text("创作环境")
+                Text("Workspace")
                     .font(.headline)
                     .foregroundStyle(.tint)
                 Spacer()
@@ -95,7 +95,7 @@ struct UserProfileDetailsView: View {
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
         }
-        .accessibilityLabel(showsWorkspace ? "收起创作环境" : "展开创作环境")
+        .accessibilityLabel(showsWorkspace ? "Collapse workspace" : "Expand workspace")
     }
 
     @ViewBuilder
@@ -125,23 +125,23 @@ struct UserProfileDetailsView: View {
     }
 
     private var profileComment: String {
-        guard let comment = detail.user.comment else { return "这位作者还没有填写简介" }
+        guard let comment = detail.user.comment else { return "This artist hasn't written a bio yet" }
         let plainText = TextSanitizer.plainText(from: comment)
-        return plainText.isEmpty ? "这位作者还没有填写简介" : plainText
+        return plainText.isEmpty ? "This artist hasn't written a bio yet" : plainText
     }
 
     private var profileRows: [ProfileRow] {
         [
-            profileRow(label: "地区", value: detail.profile.region),
-            profileRow(label: "职业", value: detail.profile.job),
-            profileRow(label: "生日", value: detail.profile.birth)
+            profileRow(label: "Region", value: detail.profile.region),
+            profileRow(label: "Occupation", value: detail.profile.job),
+            profileRow(label: "Birthday", value: detail.profile.birth)
         ].compactMap { $0 }
     }
 
     private var profileLinks: [ProfileLink] {
         var links: [ProfileLink] = []
         if let url = detail.profile.webpage {
-            links.append(ProfileLink(title: "个人网站", url: url))
+            links.append(ProfileLink(title: "Website", url: url))
         }
         if let url = detail.profile.twitterURL {
             let title = detail.profile.twitterAccount.map { "X / Twitter @\($0)" } ?? "X / Twitter"
@@ -155,14 +155,14 @@ struct UserProfileDetailsView: View {
 
     private func workspaceRows(_ workspace: PixivUserWorkspace) -> [ProfileRow] {
         [
-            profileRow(label: "电脑", value: workspace.computer),
-            profileRow(label: "显示器", value: workspace.monitor),
-            profileRow(label: "创作工具", value: workspace.tool),
-            profileRow(label: "数位板", value: workspace.tablet),
-            profileRow(label: "音乐", value: workspace.music),
-            profileRow(label: "桌子", value: workspace.desk),
-            profileRow(label: "椅子", value: workspace.chair),
-            profileRow(label: "说明", value: workspace.comment)
+            profileRow(label: "Computer", value: workspace.computer),
+            profileRow(label: "Monitor", value: workspace.monitor),
+            profileRow(label: "Tool", value: workspace.tool),
+            profileRow(label: "Tablet", value: workspace.tablet),
+            profileRow(label: "Music", value: workspace.music),
+            profileRow(label: "Desk", value: workspace.desk),
+            profileRow(label: "Chair", value: workspace.chair),
+            profileRow(label: "Notes", value: workspace.comment)
         ].compactMap { $0 }
     }
 

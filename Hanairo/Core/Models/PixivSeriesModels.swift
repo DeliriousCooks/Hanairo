@@ -64,7 +64,7 @@ nonisolated struct PixivIllustrationSeriesDetail: Decodable, Identifiable, Hasha
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(Int.self, forKey: .id)
-        title = try container.decodeIfPresent(String.self, forKey: .title) ?? "未命名系列"
+        title = try container.decodeIfPresent(String.self, forKey: .title) ?? "Untitled Series"
         caption = try container.decodeIfPresent(String.self, forKey: .caption) ?? ""
         coverImageURLs = try container.decodeIfPresent(
             PixivSeriesCoverImageURLs.self,
@@ -128,7 +128,7 @@ nonisolated struct PixivMangaSeriesSummary: Decodable, Identifiable, Hashable, S
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(Int.self, forKey: .id)
-        title = try container.decodeIfPresent(String.self, forKey: .title) ?? "未命名系列"
+        title = try container.decodeIfPresent(String.self, forKey: .title) ?? "Untitled Series"
         latestContentID = try container.decodeIfPresent(Int.self, forKey: .latestContentID) ?? 0
         lastPublishedContentDate = try container.decodeIfPresent(String.self, forKey: .lastPublishedContentDate)
         publishedContentCount = try container.decodeIfPresent(Int.self, forKey: .publishedContentCount) ?? 0

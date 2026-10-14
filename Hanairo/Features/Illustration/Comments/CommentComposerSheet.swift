@@ -27,7 +27,7 @@ struct CommentComposerSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("写评论", text: $draft, axis: .vertical)
+                    TextField("Write a Comment", text: $draft, axis: .vertical)
                         .lineLimit(4...10)
                         .focused($isEditorFocused)
                         .disabled(isPosting)
@@ -38,9 +38,9 @@ struct CommentComposerSheet: View {
                         }
                 } header: {
                     if let parentName = context.parentName {
-                        Text("回复 \(parentName)")
+                        Text("Replying to \(parentName)")
                     } else {
-                        Text("评论作品")
+                        Text("Commenting on this artwork")
                     }
                 } footer: {
                     Text("\(draft.count) / 140")
@@ -48,13 +48,13 @@ struct CommentComposerSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle(context.parentCommentID == nil ? "写评论" : "写回复")
+            .navigationTitle(context.parentCommentID == nil ? "Write a Comment" : "Write a Reply")
             .safeAreaInset(edge: .bottom) {
                 sendButton
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消", systemImage: "xmark") {
+                    Button("Cancel", systemImage: "xmark") {
                         dismiss()
                     }
                     .labelStyle(.iconOnly)
@@ -64,10 +64,10 @@ struct CommentComposerSheet: View {
             .task {
                 isEditorFocused = true
             }
-            .alert("发送失败", isPresented: errorBinding) {
-                Button("好", role: .cancel) {}
+            .alert("Failed to Send", isPresented: errorBinding) {
+                Button("OK", role: .cancel) {}
             } message: {
-                Text(errorMessage ?? "未知错误")
+                Text(errorMessage ?? "Unknown error")
             }
         }
     }
@@ -80,7 +80,7 @@ struct CommentComposerSheet: View {
                 if isPosting {
                     ProgressView()
                 } else {
-                    Text("发送")
+                    Text("Send")
                 }
             }
             .frame(maxWidth: .infinity)

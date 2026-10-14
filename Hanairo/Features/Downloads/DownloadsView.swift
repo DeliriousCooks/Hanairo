@@ -8,7 +8,7 @@ struct DownloadsView: View {
 
     var body: some View {
         List {
-            Picker("下载内容", selection: $section) {
+            Picker("Downloads Section", selection: $section) {
                 ForEach(DownloadsSection.allCases) { section in
                     Text(section.title).tag(section)
                 }
@@ -24,7 +24,7 @@ struct DownloadsView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("下载管理")
+        .navigationTitle("Downloads")
         .toolbar {
             if hasContent {
                 ToolbarItem(placement: .primaryAction) {
@@ -33,13 +33,13 @@ struct DownloadsView: View {
                     } label: {
                         Image(systemName: "trash")
                     }
-                    .accessibilityLabel(section == .queue ? "清空下载队列" : "清空下载记录")
+                    .accessibilityLabel(section == .queue ? "Clear Download Queue" : "Clear Download History")
                 }
             }
         }
         .alert(clearTitle, isPresented: $showsClearConfirmation) {
-            Button("清空", role: .destructive, action: clear)
-            Button("取消", role: .cancel) {}
+            Button("Clear", role: .destructive, action: clear)
+            Button("Cancel", role: .cancel) {}
         } message: {
             Text(clearMessage)
         }
@@ -49,9 +49,9 @@ struct DownloadsView: View {
     private var queueContent: some View {
         if downloadManager.tasks.isEmpty {
             ContentUnavailableView(
-                "暂无下载任务",
+                "No Download Tasks",
                 systemImage: "tray",
-                description: Text("作品会从详情页加入下载队列。")
+                description: Text("Artworks are added to the download queue from their detail page.")
             )
             .listRowBackground(Color.clear)
         } else {
@@ -63,14 +63,14 @@ struct DownloadsView: View {
                                 Button {
                                     downloadManager.resume(task)
                                 } label: {
-                                    Label("继续", systemImage: "play.fill")
+                                    Label("Resume", systemImage: "play.fill")
                                 }
                                 .tint(.green)
                             } else if task.status == .queued || task.status == .downloading {
                                 Button {
                                     downloadManager.pause(task)
                                 } label: {
-                                    Label("暂停", systemImage: "pause.fill")
+                                    Label("Pause", systemImage: "pause.fill")
                                 }
                                 .tint(.orange)
                             }
@@ -78,7 +78,7 @@ struct DownloadsView: View {
                             Button {
                                 downloadManager.prioritize(task)
                             } label: {
-                                Label("优先", systemImage: "arrow.up.to.line")
+                                Label("Prioritize", systemImage: "arrow.up.to.line")
                             }
                             .tint(.blue)
                         }
@@ -86,20 +86,20 @@ struct DownloadsView: View {
                             Button(role: .destructive) {
                                 downloadManager.removeTask(task)
                             } label: {
-                                Label("移除", systemImage: "trash")
+                                Label("Remove", systemImage: "trash")
                             }
                             if task.status == .failed {
                                 Button {
                                     downloadManager.retry(task)
                                 } label: {
-                                    Label("重试", systemImage: "arrow.clockwise")
+                                    Label("Retry", systemImage: "arrow.clockwise")
                                 }
                                 .tint(.blue)
                             }
                         }
                 }
             } footer: {
-                Text("右滑可暂停、继续或设为优先；左滑可移除，失败任务可以重试。")
+                Text("Swipe right to pause, resume, or prioritize. Swipe left to remove. Failed tasks can be retried.")
             }
         }
     }
@@ -108,9 +108,9 @@ struct DownloadsView: View {
     private var completedContent: some View {
         if downloadManager.records.isEmpty {
             ContentUnavailableView(
-                "暂无下载记录",
+                "No Download History",
                 systemImage: "checkmark.circle",
-                description: Text("成功保存的图片会显示在这里。")
+                description: Text("Successfully saved images appear here.")
             )
             .listRowBackground(Color.clear)
         } else {
@@ -123,12 +123,12 @@ struct DownloadsView: View {
                         Button(role: .destructive) {
                             downloadManager.removeRecord(record)
                         } label: {
-                            Label("删除", systemImage: "trash")
+                            Label("Delete", systemImage: "trash")
                         }
                     }
                 }
             } footer: {
-                Text("删除文件记录会同时删除 Hanairo Downloads 中对应的本地图片；相册中的图片不会被删除。")
+                Text("Deleting a file record also deletes the corresponding local images in Hanairo Downloads. Images in the photo library are not deleted.")
             }
         }
     }
@@ -138,13 +138,13 @@ struct DownloadsView: View {
     }
 
     private var clearTitle: String {
-        section == .queue ? "清空下载队列？" : "清空下载记录？"
+        section == .queue ? "Clear download queue?" : "Clear download history?"
     }
 
     private var clearMessage: String {
         section == .queue
-            ? "所有等待、下载中、暂停和失败的任务都会被移除，已完成的文件不会删除。"
-            : "文件记录及 Hanairo Downloads 中的本地图片会被删除，相册中的图片不会删除。"
+            ? "All waiting, downloading, paused, and failed tasks will be removed. Completed files won't be deleted."
+            : "File records and local images in Hanairo Downloads will be deleted. Images in the photo library won't be deleted."
     }
 
     private func clear() {
@@ -160,10 +160,10 @@ private enum DownloadsSection: String, CaseIterable, Identifiable {
     case completed
 
     var id: String { rawValue }
-    var title: String { self == .queue ? "队列" : "已完成" }
+    var title: String { self == .queue ? "Queue" : "Completed" }
 }
 
-#Preview("下载管理") {
+#Preview("Downloads") {
     NavigationStack {
         DownloadsView()
     }

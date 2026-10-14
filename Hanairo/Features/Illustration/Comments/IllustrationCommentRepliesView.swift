@@ -14,12 +14,12 @@ struct IllustrationCommentRepliesView: View {
 
     var body: some View {
         content
-            .navigationTitle("回复")
+            .navigationTitle("Replies")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if allowsPosting {
                     ToolbarItem(placement: .primaryAction) {
-                        Button("回复", systemImage: "arrowshape.turn.up.left") {
+                        Button("Reply", systemImage: "arrowshape.turn.up.left") {
                             composerContext = replyContext
                         }
                         .labelStyle(.iconOnly)
@@ -33,12 +33,12 @@ struct IllustrationCommentRepliesView: View {
                 CommentComposerSheet(illustrationID: illustrationID, context: context)
                     .presentationDetents([.medium])
             }
-            .alert("刷新失败", isPresented: refreshErrorBinding) {
-                Button("好", role: .cancel) {
+            .alert("Refresh Failed", isPresented: refreshErrorBinding) {
+                Button("OK", role: .cancel) {
                     replies.clearRefreshError()
                 }
             } message: {
-                Text(replies.refreshError ?? "未知错误")
+                Text(replies.refreshError ?? "Unknown error")
             }
     }
 
@@ -46,7 +46,7 @@ struct IllustrationCommentRepliesView: View {
     private var content: some View {
         switch replies.phase {
         case .idle, .loading:
-            ProgressView("正在加载回复…")
+            ProgressView("Loading replies…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case let .failed(message):
             ErrorStateView(message: message) {
@@ -54,9 +54,9 @@ struct IllustrationCommentRepliesView: View {
             }
         case .loaded:
             List {
-                Section("原评论") {
+                Section("Original Comment") {
                     if localBlocks.isBlocked(parentComment) {
-                        Text("原评论已在本地隐藏")
+                        Text("The original comment is hidden locally")
                             .foregroundStyle(.secondary)
                     } else {
                         PixivCommentRow(
@@ -70,9 +70,9 @@ struct IllustrationCommentRepliesView: View {
                     }
                 }
 
-                Section("回复") {
+                Section("Replies") {
                     if visibleReplies.isEmpty && replies.nextURL == nil {
-                        Text("暂无回复")
+                        Text("No Replies Yet")
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(visibleReplies) { reply in

@@ -22,11 +22,11 @@ struct SearchView: View {
             .padding(.horizontal)
             .padding(.bottom, 24)
         }
-        .navigationTitle("搜索")
+        .navigationTitle("Search")
         .searchable(
             text: $store.query,
             placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "搜索作品、标签或用户"
+            prompt: "Search artworks, tags, or users"
         )
         .onSubmit(of: .search) {
             openDirectIDIfPossible()
@@ -60,7 +60,7 @@ struct SearchView: View {
                 NavigationLink(value: AppRoute.reverseImageSearch) {
                     Image(systemName: "photo.badge.magnifyingglass")
                 }
-                .accessibilityLabel("识图")
+                .accessibilityLabel("Reverse Image Search")
 
                 Button {
                     showsFilters = true
@@ -69,7 +69,7 @@ struct SearchView: View {
                           ? "line.3.horizontal.decrease.circle"
                           : "line.3.horizontal.decrease.circle.fill")
                 }
-                .accessibilityLabel("搜索筛选")
+                .accessibilityLabel("Search Filters")
                 .disabled(store.scope == .users)
             }
         }
@@ -97,12 +97,12 @@ struct SearchView: View {
         .refreshable {
             await store.refresh(requestKey: requestKey, using: repository)
         }
-        .alert("操作失败", isPresented: actionErrorBinding) {
-            Button("好", role: .cancel) {
+        .alert("Action Failed", isPresented: actionErrorBinding) {
+            Button("OK", role: .cancel) {
                 store.clearDisplayedError()
             }
         } message: {
-            Text(store.displayedError ?? "未知错误")
+            Text(store.displayedError ?? "Unknown error")
         }
     }
 
@@ -127,29 +127,29 @@ struct SearchView: View {
     private func directAccess(id: Int) -> some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 12) {
-                Text("检测到 ID \(id)，可跳过关键词搜索直接查看详情。")
+                Text("ID \(id) detected. You can skip keyword search and view details directly.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 10) {
                     NavigationLink(value: AppRoute.illustration(id: id)) {
-                        Label("打开作品", systemImage: "photo")
+                        Label("Open Artwork", systemImage: "photo")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-                    .accessibilityHint("打开作品 ID \(id)")
+                    .accessibilityHint("Open artwork ID \(id)")
 
                     NavigationLink(value: AppRoute.user(id: id)) {
-                        Label("打开用户", systemImage: "person")
+                        Label("Open User", systemImage: "person")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
-                    .accessibilityHint("打开用户 ID \(id)")
+                    .accessibilityHint("Open user ID \(id)")
                 }
                 .controlSize(.large)
             }
         } label: {
-            Label("ID 直达", systemImage: "arrow.right.circle.fill")
+            Label("Jump to ID", systemImage: "arrow.right.circle.fill")
         }
     }
 
@@ -178,7 +178,7 @@ struct SearchView: View {
                 ContentUnavailableView.search(text: store.normalizedQuery)
                     .frame(minHeight: 360)
             } else {
-                Text("作品结果")
+                Text("Artwork Results")
                     .font(.title2.weight(.bold))
                 ArtworkGrid(
                     illustrations: store.illustrationResults.items,
@@ -199,7 +199,7 @@ struct SearchView: View {
     private var userResults: some View {
         switch store.userResults.phase {
         case .idle, .loading:
-            ProgressView("正在搜索用户…")
+            ProgressView("Searching users…")
                 .frame(maxWidth: .infinity, minHeight: 260)
         case let .failed(message):
             ErrorStateView(message: message) {
@@ -211,7 +211,7 @@ struct SearchView: View {
                 ContentUnavailableView.search(text: store.normalizedQuery)
                     .frame(minHeight: 360)
             } else {
-                Text("用户结果")
+                Text("User Results")
                     .font(.title2.weight(.bold))
                 ForEach(visibleUserResults) { user in
                     UserRow(preview: user, showsFollowButton: true)
@@ -234,10 +234,10 @@ struct SearchView: View {
     private var searchLanding: some View {
         if !store.history.isEmpty {
             HStack {
-                Text("最近搜索")
+                Text("Recent Searches")
                     .font(.title3.weight(.semibold))
                 Spacer()
-                Button("清除") {
+                Button("Clear") {
                     store.clearHistory()
                 }
                 .font(.subheadline)
@@ -250,7 +250,7 @@ struct SearchView: View {
                         }
                         .buttonStyle(.bordered)
                         .contextMenu {
-                            Button("移除", systemImage: "trash", role: .destructive) {
+                            Button("Remove", systemImage: "trash", role: .destructive) {
                                 store.removeHistory(term)
                             }
                         }
@@ -259,7 +259,7 @@ struct SearchView: View {
             }
         }
 
-        Text("热门标签")
+        Text("Trending Tags")
             .font(.title2.weight(.bold))
         if store.trendingTags.isEmpty {
             ProgressView()
@@ -300,7 +300,7 @@ struct SearchView: View {
             values.append(store.options.bookmarkThreshold.title)
         }
         if store.options.usesDateRange {
-            values.append("限定日期")
+            values.append("Date Range")
         }
         return values.joined(separator: " · ")
     }
@@ -328,7 +328,7 @@ struct SearchView: View {
     }
 }
 
-#Preview("搜索首页") {
+#Preview("Search Home") {
     NavigationStack {
         SearchView()
     }

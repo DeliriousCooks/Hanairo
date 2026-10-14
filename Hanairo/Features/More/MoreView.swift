@@ -10,55 +10,55 @@ struct MoreView: View {
 
             Section("Pixiv") {
                 NavigationLink(value: AppRoute.mangaWatchlist) {
-                    Label("漫画追更", systemImage: "books.vertical")
+                    Label("Manga Watchlist", systemImage: "books.vertical")
                 }
                 NavigationLink(value: AppRoute.downloads) {
-                    Label("下载管理", systemImage: "arrow.down.circle")
+                    Label("Downloads", systemImage: "arrow.down.circle")
                 }
                 NavigationLink(value: AppRoute.browsingHistory) {
-                    Label("浏览历史", systemImage: "clock.arrow.circlepath")
+                    Label("Browsing History", systemImage: "clock.arrow.circlepath")
                 }
             }
 
             Section("Hanairo") {
                 NavigationLink(value: AppRoute.settings) {
-                    Label("设置", systemImage: "gearshape")
+                    Label("Settings", systemImage: "gearshape")
                 }
                 NavigationLink(value: AppRoute.about) {
-                    Label("关于", systemImage: "info.circle")
+                    Label("About", systemImage: "info.circle")
                 }
             }
 
-            Section("链接") {
+            Section("Links") {
                 Link(destination: URL(string: "https://www.pixiv.net")!) {
-                    Label("打开 Pixiv", systemImage: "arrow.up.right.square")
+                    Label("Open Pixiv", systemImage: "arrow.up.right.square")
                 }
             }
 
             Section {
-                Text("Hanairo 是非官方 Pixiv 客户端，与 pixiv Inc. 没有隶属关系。")
+                Text("Hanairo is an unofficial Pixiv client and is not affiliated with pixiv Inc.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("我的")
+        .navigationTitle("Me")
         .confirmationDialog(
-            "退出当前账户？",
+            "Sign out of this account?",
             isPresented: $showsSignOutConfirmation,
             titleVisibility: .visible
         ) {
-            Button("退出登录", role: .destructive) {
+            Button("Sign Out", role: .destructive) {
                 authentication.signOut()
             }
-            Button("取消", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("本机钥匙串中的 Pixiv 令牌将被删除。")
+            Text("The Pixiv token in this device's Keychain will be deleted.")
         }
     }
 
     @ViewBuilder
     private var accountSection: some View {
-        Section("账户") {
+        Section("Account") {
             if let account = authentication.account, let id = account.numericID {
                 let preview = PixivUser(
                     id: id,
@@ -88,7 +88,7 @@ struct MoreView: View {
                     }
                     .appNavigationTransitionSource(for: .user(id: id))
                 }
-                Button("退出登录", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+                Button("Sign Out", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
                     showsSignOutConfirmation = true
                 }
             }
@@ -96,7 +96,7 @@ struct MoreView: View {
     }
 }
 
-#Preview("我的") {
+#Preview("Me") {
     NavigationStack {
         MoreView()
     }

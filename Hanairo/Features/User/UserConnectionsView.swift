@@ -15,7 +15,7 @@ struct UserConnectionsView: View {
         ScrollView {
             LazyVStack(spacing: 14) {
                 if showsVisibilityPicker {
-                    Picker("关注范围", selection: $visibility) {
+                    Picker("Following Scope", selection: $visibility) {
                         ForEach(PixivVisibility.allCases) { visibility in
                             Text(visibility.title).tag(visibility)
                         }
@@ -35,10 +35,10 @@ struct UserConnectionsView: View {
         .task(id: requestKey) {
             await loadIfNeeded()
         }
-        .alert("刷新失败", isPresented: refreshErrorBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Refresh Failed", isPresented: refreshErrorBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(users.refreshError ?? "未知错误")
+            Text(users.refreshError ?? "Unknown error")
         }
     }
 
@@ -46,7 +46,7 @@ struct UserConnectionsView: View {
     private var content: some View {
         switch users.phase {
         case .idle, .loading:
-            ProgressView("正在加载用户…")
+            ProgressView("Loading users…")
                 .frame(maxWidth: .infinity, minHeight: 360)
         case let .failed(message):
             ErrorStateView(message: message) {
@@ -133,7 +133,7 @@ struct UserConnectionsView: View {
     }
 }
 
-#Preview("关注列表") {
+#Preview("Following List") {
     NavigationStack {
         UserConnectionsView(userID: 101, kind: .following)
     }

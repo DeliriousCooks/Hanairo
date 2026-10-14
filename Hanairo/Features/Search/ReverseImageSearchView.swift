@@ -9,7 +9,7 @@ struct ReverseImageSearchView: View {
     @State private var selectedItem: PhotosPickerItem?
     @State private var selectedImageData: Data?
     @State private var state: LoadState<ReverseImageSearchResult> = .idle
-    @State private var statusMessage = "正在处理图片…"
+    @State private var statusMessage = "Processing image…"
     @State private var activeSearchID: UUID?
     @State private var actionError: String?
 
@@ -22,7 +22,7 @@ struct ReverseImageSearchView: View {
             .padding()
             .padding(.bottom, 24)
         }
-        .navigationTitle("识图")
+        .navigationTitle("Reverse Image Search")
         .task(id: selectedItem) {
             guard let selectedItem else { return }
             await search(selectedItem)
@@ -30,10 +30,10 @@ struct ReverseImageSearchView: View {
         .onDisappear {
             activeSearchID = nil
         }
-        .alert("操作失败", isPresented: actionErrorBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Action Failed", isPresented: actionErrorBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(actionError ?? "未知错误")
+            Text(actionError ?? "Unknown error")
         }
     }
 
@@ -48,7 +48,7 @@ struct ReverseImageSearchView: View {
 
                 PhotosPicker(selection: $selectedItem, matching: .images) {
                     Label(
-                        selectedImageData == nil ? "选择图片" : "重新选择图片",
+                        selectedImageData == nil ? "Choose Image" : "Choose Another Image",
                         systemImage: "photo.on.rectangle.angled"
                     )
                     .frame(maxWidth: .infinity)
@@ -57,9 +57,9 @@ struct ReverseImageSearchView: View {
                 .controlSize(.large)
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("所选图片会上传至 SauceNAO 进行来源比对；Hanairo 不会保存图片。")
+                    Text("The selected image is uploaded to SauceNAO to find its source. Hanairo does not store the image.")
                     Link(
-                        "查看 SauceNAO 隐私说明",
+                        "View SauceNAO Privacy Policy",
                         destination: URL(string: "https://saucenao.com/legal.html")!
                     )
                 }
@@ -67,7 +67,7 @@ struct ReverseImageSearchView: View {
                 .foregroundStyle(.secondary)
             }
         } label: {
-            Label("选择用于识别的图片", systemImage: "photo.badge.magnifyingglass")
+            Label("Choose an Image to Identify", systemImage: "photo.badge.magnifyingglass")
         }
     }
 
@@ -76,9 +76,9 @@ struct ReverseImageSearchView: View {
         switch state {
         case .idle:
             ContentUnavailableView {
-                Label("以图搜源", systemImage: "sparkle.magnifyingglass")
+                Label("Find Source by Image", systemImage: "sparkle.magnifyingglass")
             } description: {
-                Text("建议选择完整、清晰且没有拼接边框的单张图片。")
+                Text("Choose a single complete, clear image without collage borders.")
             }
             .frame(maxWidth: .infinity, minHeight: 260)
         case .loading:
@@ -87,19 +87,19 @@ struct ReverseImageSearchView: View {
                     .controlSize(.large)
                 Text(statusMessage)
                     .font(.headline)
-                Text("识别通常需要数秒，请保持网络连接。")
+                Text("Identification usually takes a few seconds. Keep your network connected.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, minHeight: 260)
         case let .failed(message):
             ContentUnavailableView {
-                Label("识图失败", systemImage: "photo.badge.exclamationmark")
+                Label("Search Failed", systemImage: "photo.badge.exclamationmark")
             } description: {
                 Text(message)
             } actions: {
                 if let selectedImageData {
-                    Button("重试") {
+                    Button("Retry") {
                         retrySearch(with: selectedImageData)
                     }
                     .buttonStyle(.borderedProminent)
@@ -115,17 +115,17 @@ struct ReverseImageSearchView: View {
     private func loadedContent(_ result: ReverseImageSearchResult) -> some View {
         if result.artworkIDs.isEmpty {
             ContentUnavailableView {
-                Label("未找到 Pixiv 作品", systemImage: "photo.badge.magnifyingglass")
+                Label("No Pixiv Artwork Found", systemImage: "photo.badge.magnifyingglass")
             } description: {
-                Text("可以尝试使用更完整、清晰的原图再次识别。")
+                Text("Try again with a more complete, clearer original image.")
             }
             .frame(maxWidth: .infinity, minHeight: 260)
         } else {
             HStack(alignment: .firstTextBaseline) {
-                Text("识别结果")
+                Text("Results")
                     .font(.title2.weight(.bold))
                 Spacer()
-                Text("\(result.artworkIDs.count) 个候选")
+                Text("\(result.artworkIDs.count) candidates")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -138,14 +138,14 @@ struct ReverseImageSearchView: View {
 
             if !result.unavailableArtworkIDs.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(result.illustrations.isEmpty ? "候选作品" : "其他候选作品")
+                    Text(result.illustrations.isEmpty ? "Candidate Artworks" : "Other Candidate Artworks")
                         .font(.headline)
                     ForEach(result.unavailableArtworkIDs, id: \.self) { id in
                         NavigationLink(value: AppRoute.illustration(id: id)) {
                             HStack(spacing: 12) {
                                 Image(systemName: "photo")
                                     .frame(width: 28)
-                                Text("作品 ID \(id)")
+                                Text("Artwork ID \(id)")
                                     .font(.body.weight(.medium))
                                 Spacer()
                                 Image(systemName: "chevron.right")
@@ -176,7 +176,7 @@ struct ReverseImageSearchView: View {
         let searchID = UUID()
         activeSearchID = searchID
         selectedImageData = nil
-        statusMessage = "正在读取并处理图片…"
+        statusMessage = "Reading and processing image…"
         state = .loading
 
         do {
@@ -204,7 +204,7 @@ struct ReverseImageSearchView: View {
     }
 
     private func searchPreparedImage(_ jpegData: Data, searchID: UUID) async {
-        statusMessage = "正在上传至 SauceNAO 识别…"
+        statusMessage = "Uploading to SauceNAO…"
         state = .loading
         do {
             let artworkIDs = try await imageSearch.searchPixivArtworkIDs(jpegData: jpegData)
@@ -212,7 +212,7 @@ struct ReverseImageSearchView: View {
 
             var illustrations: [PixivIllustration] = []
             if !artworkIDs.isEmpty {
-                statusMessage = "正在加载匹配的 Pixiv 作品…"
+                statusMessage = "Loading matching Pixiv artworks…"
                 for artworkID in artworkIDs {
                     guard activeSearchID == searchID, !Task.isCancelled else { return }
                     do {
@@ -281,7 +281,7 @@ private struct ReverseImageSearchPreview: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityLabel("待识别图片预览")
+        .accessibilityLabel("Preview of image to identify")
         .task(id: data) {
             image = await Task.detached(priority: .userInitiated) {
                 guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
@@ -293,7 +293,7 @@ private struct ReverseImageSearchPreview: View {
     }
 }
 
-#Preview("识图") {
+#Preview("Reverse Image Search") {
     NavigationStack {
         ReverseImageSearchView()
     }

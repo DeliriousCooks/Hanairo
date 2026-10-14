@@ -8,29 +8,29 @@ struct InteractionSettingsView: View {
 
         Form {
             Section {
-                Picker("默认收藏范围", selection: $settings.defaultBookmarkVisibility) {
+                Picker("Default Bookmark Visibility", selection: $settings.defaultBookmarkVisibility) {
                     ForEach(PixivVisibility.allCases) { visibility in
                         Text(visibility.title).tag(visibility)
                     }
                 }
 
-                Picker("默认关注范围", selection: $settings.defaultFollowVisibility) {
+                Picker("Default Follow Visibility", selection: $settings.defaultFollowVisibility) {
                     ForEach(PixivVisibility.allCases) { visibility in
                         Text(visibility.title).tag(visibility)
                     }
                 }
             } header: {
-                Text("默认可见性")
+                Text("Default Visibility")
             } footer: {
-                Text("快速收藏或关注时使用这里的范围；在作品与作者页面仍可单独修改。")
+                Text("Used for quick bookmarks and follows. You can still change it individually on artwork and artist pages.")
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("收藏与关注")
+        .navigationTitle("Bookmarks & Following")
     }
 }
 
-#Preview("收藏与关注设置") {
+#Preview("Bookmark & Follow Settings") {
     NavigationStack {
         InteractionSettingsView()
     }

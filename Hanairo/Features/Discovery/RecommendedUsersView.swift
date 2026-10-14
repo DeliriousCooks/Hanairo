@@ -14,7 +14,7 @@ struct RecommendedUsersView: View {
             }
             .padding()
         }
-        .navigationTitle("推荐作者")
+        .navigationTitle("Recommended Artists")
         .task(id: requestKey) {
             await users.loadIfNeeded(requestKey: requestKey) {
                 try await repository.recommendedUsers()
@@ -31,7 +31,7 @@ struct RecommendedUsersView: View {
     private var content: some View {
         switch users.phase {
         case .idle, .loading:
-            ProgressView("正在加载推荐作者…")
+            ProgressView("Loading recommended artists…")
                 .frame(maxWidth: .infinity, minHeight: 320)
         case let .failed(message):
             ErrorStateView(message: message) {
@@ -44,7 +44,7 @@ struct RecommendedUsersView: View {
             .frame(minHeight: 320)
         case .loaded:
             if visibleUsers.isEmpty {
-                ContentUnavailableView("暂无推荐作者", systemImage: "person.2")
+                ContentUnavailableView("No Recommended Artists", systemImage: "person.2")
                     .frame(minHeight: 320)
             } else {
                 ForEach(visibleUsers) { preview in
@@ -79,7 +79,7 @@ struct RecommendedUsersView: View {
     }
 }
 
-#Preview("推荐作者") {
+#Preview("Recommended Artists") {
     NavigationStack {
         RecommendedUsersView()
     }

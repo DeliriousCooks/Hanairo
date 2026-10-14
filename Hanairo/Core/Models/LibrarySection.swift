@@ -9,9 +9,9 @@ enum LibrarySection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .bookmarks: "收藏"
-        case .followingFeed: "动态"
-        case .followingUsers: "关注"
+        case .bookmarks: "Bookmarks"
+        case .followingFeed: "Feed"
+        case .followingUsers: "Following"
         }
     }
 }

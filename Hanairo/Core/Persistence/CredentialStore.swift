@@ -60,7 +60,7 @@ private enum CredentialStoreError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .keychain(status):
-            "钥匙串操作失败（\(status)）"
+            "Keychain operation failed (\(status))"
         }
     }
 }

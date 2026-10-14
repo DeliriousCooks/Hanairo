@@ -7,7 +7,7 @@ struct ErrorStateView: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label("加载失败", systemImage: "wifi.exclamationmark")
+            Label("Failed to Load", systemImage: "wifi.exclamationmark")
         } description: {
             Text(message)
         } actions: {
@@ -21,7 +21,7 @@ struct ErrorStateView: View {
         fallbackRetryButton
 #else
         if #available(iOS 26.0, macOS 26.0, *), usesGlassButton {
-            Button("重试", action: retry)
+            Button("Retry", action: retry)
                 .buttonStyle(.glassProminent)
         } else {
             fallbackRetryButton
@@ -30,7 +30,7 @@ struct ErrorStateView: View {
     }
 
     private var fallbackRetryButton: some View {
-        Button("重试", action: retry)
+        Button("Retry", action: retry)
             .buttonStyle(.borderedProminent)
     }
 }

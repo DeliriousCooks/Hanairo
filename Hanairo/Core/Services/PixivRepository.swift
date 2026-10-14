@@ -326,7 +326,7 @@ final class PixivRepository {
             try await api.illustrationSeries(id: id, accessToken: token)
         }
         guard var detail = response.detail else {
-            throw NetworkError.decoding("系列详情不存在")
+            throw NetworkError.decoding("Series details not found")
         }
         if let override = seriesWatchOverrides[id] {
             detail.watchlistAdded = override

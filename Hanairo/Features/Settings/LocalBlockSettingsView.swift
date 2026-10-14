@@ -11,14 +11,14 @@ struct LocalBlockSettingsView: View {
         List {
             if localBlocks.totalCount == 0 {
                 ContentUnavailableView(
-                    "没有本地屏蔽内容",
+                    "No Local Blocks",
                     systemImage: "hand.raised",
-                    description: Text("可在作品卡片、作品详情、评论区或作者主页中添加屏蔽。")
+                    description: Text("You can add blocks from artwork cards, artwork details, comments, or artist profiles.")
                 )
             }
 
             if !localBlocks.tags.isEmpty {
-                Section("标签") {
+                Section("Tags") {
                     ForEach(localBlocks.tags) { tag in
                         VStack(alignment: .leading, spacing: 3) {
                             Text("#\(tag.displayName)")
@@ -37,7 +37,7 @@ struct LocalBlockSettingsView: View {
             }
 
             if !localBlocks.users.isEmpty {
-                Section("作者") {
+                Section("Artists") {
                     ForEach(localBlocks.users) { user in
                         LabeledContent(user.name, value: "ID \(user.id)")
                     }
@@ -49,7 +49,7 @@ struct LocalBlockSettingsView: View {
             }
 
             if !localBlocks.artworks.isEmpty {
-                Section("作品") {
+                Section("Artworks") {
                     ForEach(localBlocks.artworks) { artwork in
                         LabeledContent(artwork.title, value: "ID \(artwork.id)")
                     }
@@ -61,7 +61,7 @@ struct LocalBlockSettingsView: View {
             }
 
             if !localBlocks.comments.isEmpty {
-                Section("评论") {
+                Section("Comments") {
                     ForEach(localBlocks.comments) { comment in
                         VStack(alignment: .leading, spacing: 3) {
                             Text(comment.authorName)
@@ -79,36 +79,36 @@ struct LocalBlockSettingsView: View {
                 }
             }
         }
-        .navigationTitle("本地屏蔽")
+        .navigationTitle("Local Blocks")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Button("添加标签", systemImage: "plus") {
+                Button("Add Tag", systemImage: "plus") {
                     newTag = ""
                     showsAddTag = true
                 }
                 .labelStyle(.iconOnly)
 
-                Button("清空", systemImage: "trash", role: .destructive) {
+                Button("Clear", systemImage: "trash", role: .destructive) {
                     showsClearConfirmation = true
                 }
                 .labelStyle(.iconOnly)
                 .disabled(localBlocks.totalCount == 0)
             }
         }
-        .alert("添加屏蔽标签", isPresented: $showsAddTag) {
-            TextField("标签名称", text: $newTag)
-            Button("取消", role: .cancel) {}
-            Button("添加") {
+        .alert("Add Blocked Tag", isPresented: $showsAddTag) {
+            TextField("Tag Name", text: $newTag)
+            Button("Cancel", role: .cancel) {}
+            Button("Add") {
                 localBlocks.blockTag(name: newTag)
             }
         }
         .confirmationDialog(
-            "清空全部本地屏蔽？",
+            "Clear all local blocks?",
             isPresented: $showsClearConfirmation,
             titleVisibility: .visible
         ) {
-            Button("清空", role: .destructive) { localBlocks.clear() }
-            Button("取消", role: .cancel) {}
+            Button("Clear", role: .destructive) { localBlocks.clear() }
+            Button("Cancel", role: .cancel) {}
         }
     }
 }

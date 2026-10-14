@@ -3,62 +3,62 @@ import SwiftUI
 struct SettingsView: View {
     var body: some View {
         Form {
-            Section("界面与内容") {
+            Section("Interface & Content") {
                 NavigationLink {
                     AppearanceSettingsView()
                 } label: {
-                    Label("外观与图片", systemImage: "paintbrush")
+                    Label("Appearance & Images", systemImage: "paintbrush")
                 }
 
                 NavigationLink {
                     ContentSettingsView()
                 } label: {
-                    Label("内容过滤", systemImage: "line.3.horizontal.decrease.circle")
+                    Label("Content Filtering", systemImage: "line.3.horizontal.decrease.circle")
                 }
             }
 
-            Section("Pixiv 交互") {
+            Section("Pixiv Interaction") {
                 NavigationLink {
                     InteractionSettingsView()
                 } label: {
-                    Label("收藏与关注", systemImage: "heart.text.square")
+                    Label("Bookmarks & Following", systemImage: "heart.text.square")
                 }
             }
 
-            Section("连接") {
+            Section("Connection") {
                 NavigationLink {
                     NetworkSettingsView()
                 } label: {
-                    Label("网络", systemImage: "network")
+                    Label("Network", systemImage: "network")
                 }
             }
 
-            Section("文件与存储") {
+            Section("Files & Storage") {
                 NavigationLink {
                     DownloadSettingsView()
                 } label: {
-                    Label("下载", systemImage: "arrow.down.circle")
+                    Label("Downloads", systemImage: "arrow.down.circle")
                 }
 
                 NavigationLink {
                     CacheSettingsView()
                 } label: {
-                    Label("缓存", systemImage: "internaldrive")
+                    Label("Cache", systemImage: "internaldrive")
                 }
             }
 
-            Section("隐私与本地数据") {
+            Section("Privacy & Local Data") {
                 NavigationLink(value: AppRoute.localDataSettings) {
-                    Label("历史与屏蔽", systemImage: "hand.raised")
+                    Label("History & Blocks", systemImage: "hand.raised")
                 }
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("设置")
+        .navigationTitle("Settings")
     }
 }
 
-#Preview("设置") {
+#Preview("Settings") {
     NavigationStack {
         SettingsView()
     }

@@ -11,17 +11,17 @@ enum NetworkError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            "请求地址无效"
+            "Invalid request URL"
         case .invalidResponse:
-            "服务器返回了无法识别的响应"
+            "The server returned an unrecognized response"
         case .authenticationRequired:
-            "请先登录 Pixiv 账户"
+            "Please sign in to your Pixiv account first"
         case let .server(statusCode, message):
-            message.isEmpty ? "请求失败（\(statusCode)）" : message
+            message.isEmpty ? "Request failed (\(statusCode))" : message
         case let .decoding(message):
-            "数据解析失败：\(message)"
+            "Failed to parse data: \(message)"
         case .invalidImage:
-            "图片数据无法读取"
+            "Image data couldn't be read"
         }
     }
 }

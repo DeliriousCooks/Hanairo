@@ -9,9 +9,9 @@ enum PixivSearchTarget: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var title: String {
         switch self {
-        case .partialTag: "标签部分匹配"
-        case .exactTag: "标签完全匹配"
-        case .titleAndCaption: "标题与简介"
+        case .partialTag: "Partial Tag Match"
+        case .exactTag: "Exact Tag Match"
+        case .titleAndCaption: "Title & Caption"
         }
     }
 }
@@ -27,11 +27,11 @@ enum PixivSearchSort: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var title: String {
         switch self {
-        case .newest: "最新优先"
-        case .oldest: "最早优先"
-        case .popular: "热门优先"
-        case .popularAmongMen: "男性用户热门"
-        case .popularAmongWomen: "女性用户热门"
+        case .newest: "Newest First"
+        case .oldest: "Oldest First"
+        case .popular: "Most Popular"
+        case .popularAmongMen: "Popular Among Men"
+        case .popularAmongWomen: "Popular Among Women"
         }
     }
 
@@ -53,10 +53,10 @@ enum PixivSearchMediaFilter: String, CaseIterable, Identifiable, Codable, Sendab
 
     var title: String {
         switch self {
-        case .all: "全部作品"
-        case .illustrations: "仅插画"
-        case .manga: "仅漫画"
-        case .ugoira: "仅动图"
+        case .all: "All Artworks"
+        case .illustrations: "Illustrations Only"
+        case .manga: "Manga Only"
+        case .ugoira: "Ugoira Only"
         }
     }
 
@@ -75,7 +75,7 @@ enum PixivSearchAIFilter: Int, CaseIterable, Identifiable, Codable, Sendable {
     case excludesAI = 1
 
     var id: Int { rawValue }
-    var title: String { self == .all ? "包含 AI 作品" : "排除 AI 作品" }
+    var title: String { self == .all ? "Include AI Artworks" : "Exclude AI Artworks" }
 }
 
 enum PixivBookmarkThreshold: Int, CaseIterable, Identifiable, Codable, Sendable {
@@ -87,7 +87,7 @@ enum PixivBookmarkThreshold: Int, CaseIterable, Identifiable, Codable, Sendable 
     case tenThousand = 10_000
 
     var id: Int { rawValue }
-    var title: String { self == .any ? "不限" : "至少 \(rawValue) 收藏" }
+    var title: String { self == .any ? "Any" : "At least \(rawValue) bookmarks" }
 }
 
 struct PixivSearchOptions: Hashable, Codable, Sendable {

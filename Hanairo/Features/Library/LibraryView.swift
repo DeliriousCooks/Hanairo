@@ -39,7 +39,7 @@ struct LibraryView: View {
                 await refresh()
             }
         }
-        .navigationTitle("收藏与关注")
+        .navigationTitle("Bookmarks & Following")
         .task(id: requestKey) {
             await loadIfNeeded()
         }
@@ -50,15 +50,15 @@ struct LibraryView: View {
         .onChange(of: bookmarkVisibility) {
             selectedBookmarkTag = nil
         }
-        .alert("操作失败", isPresented: actionErrorBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Action Failed", isPresented: actionErrorBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(displayedError ?? "未知错误")
+            Text(displayedError ?? "Unknown error")
         }
     }
 
     private var sectionPicker: some View {
-        Picker("内容", selection: $section) {
+        Picker("Content", selection: $section) {
             ForEach(LibrarySection.allCases) { section in
                 Text(section.title).tag(section)
             }
@@ -70,11 +70,11 @@ struct LibraryView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
                 wideFilterMenu(
-                    title: "内容",
+                    title: "Content",
                     value: section.title,
                     systemImage: section.systemImage
                 ) {
-                    Picker("内容", selection: $section) {
+                    Picker("Content", selection: $section) {
                         ForEach(LibrarySection.allCases) { section in
                             Label(section.title, systemImage: section.systemImage)
                                 .tag(section)
@@ -89,7 +89,7 @@ struct LibraryView: View {
             if section == .bookmarks {
                 Divider()
                 HStack(spacing: 12) {
-                    Label("标签", systemImage: "tag")
+                    Label("Tags", systemImage: "tag")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
 
@@ -118,11 +118,11 @@ struct LibraryView: View {
         switch section {
         case .bookmarks:
             wideFilterMenu(
-                title: "收藏范围",
+                title: "Bookmark Visibility",
                 value: bookmarkVisibility.title,
                 systemImage: "lock"
             ) {
-                Picker("收藏范围", selection: $bookmarkVisibility) {
+                Picker("Bookmark Visibility", selection: $bookmarkVisibility) {
                     ForEach(PixivVisibility.allCases) { visibility in
                         Text(visibility.title).tag(visibility)
                     }
@@ -130,11 +130,11 @@ struct LibraryView: View {
             }
         case .followingFeed:
             wideFilterMenu(
-                title: "关注范围",
+                title: "Following Scope",
                 value: followingScope.title,
                 systemImage: "person.2"
             ) {
-                Picker("关注范围", selection: $followingScope) {
+                Picker("Following Scope", selection: $followingScope) {
                     ForEach(FollowingFeedScope.allCases) { scope in
                         Text(scope.title).tag(scope)
                     }
@@ -142,11 +142,11 @@ struct LibraryView: View {
             }
         case .followingUsers:
             wideFilterMenu(
-                title: "关注范围",
+                title: "Following Visibility",
                 value: followingVisibility.title,
                 systemImage: "person.crop.circle"
             ) {
-                Picker("关注范围", selection: $followingVisibility) {
+                Picker("Following Visibility", selection: $followingVisibility) {
                     ForEach(PixivVisibility.allCases) { visibility in
                         Text(visibility.title).tag(visibility)
                     }
@@ -193,7 +193,7 @@ struct LibraryView: View {
     private var activeFilter: some View {
         switch section {
         case .bookmarks:
-            Picker("收藏范围", selection: $bookmarkVisibility) {
+            Picker("Bookmark Visibility", selection: $bookmarkVisibility) {
                 ForEach(PixivVisibility.allCases) { visibility in
                     Text(visibility.title).tag(visibility)
                 }
@@ -210,14 +210,14 @@ struct LibraryView: View {
                 onLoadMore: loadMoreBookmarkTags
             )
         case .followingFeed:
-            Picker("关注范围", selection: $followingScope) {
+            Picker("Following Scope", selection: $followingScope) {
                 ForEach(FollowingFeedScope.allCases) { scope in
                     Text(scope.title).tag(scope)
                 }
             }
             .pickerStyle(.segmented)
         case .followingUsers:
-            Picker("关注范围", selection: $followingVisibility) {
+            Picker("Following Visibility", selection: $followingVisibility) {
                 ForEach(PixivVisibility.allCases) { visibility in
                     Text(visibility.title).tag(visibility)
                 }
@@ -249,7 +249,7 @@ struct LibraryView: View {
         case .loaded:
             if illustrations.items.isEmpty {
                 ContentUnavailableView(
-                    section == .bookmarks ? "还没有收藏" : "暂无关注动态",
+                    section == .bookmarks ? "No Bookmarks Yet" : "No Following Feed Yet",
                     systemImage: section == .bookmarks ? "heart" : "person.2"
                 )
                 .frame(minHeight: 360)
@@ -274,7 +274,7 @@ struct LibraryView: View {
     private var userContent: some View {
         switch users.phase {
         case .idle, .loading:
-            ProgressView("正在加载关注用户…")
+            ProgressView("Loading followed users…")
                 .frame(maxWidth: .infinity, minHeight: 360)
         case let .failed(message):
             ErrorStateView(message: message) {
@@ -283,7 +283,7 @@ struct LibraryView: View {
             .frame(minHeight: 360)
         case .loaded:
             if users.items.isEmpty {
-                ContentUnavailableView("暂无关注用户", systemImage: "person.2")
+                ContentUnavailableView("No Following Users Yet", systemImage: "person.2")
                     .frame(minHeight: 360)
             } else {
                 LazyVStack(spacing: 14) {
@@ -518,7 +518,7 @@ private extension LibrarySection {
     }
 }
 
-#Preview("收藏") {
+#Preview("Bookmarks") {
     NavigationStack {
         LibraryView()
     }

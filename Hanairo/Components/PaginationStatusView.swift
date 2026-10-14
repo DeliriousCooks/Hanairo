@@ -9,7 +9,7 @@ struct PaginationStatusView: View {
     var body: some View {
         Group {
             if isLoading {
-                ProgressView("正在加载更多…")
+                ProgressView("Loading more…")
                     .controlSize(.small)
             } else if let errorMessage {
                 VStack(spacing: 8) {
@@ -41,7 +41,7 @@ struct PaginationStatusView: View {
     }
 
     private var retryAction: some View {
-        Button("重新加载", systemImage: "arrow.clockwise") {
+        Button("Reload", systemImage: "arrow.clockwise") {
             Task { await onRetry() }
         }
     }

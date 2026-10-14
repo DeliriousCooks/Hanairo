@@ -38,7 +38,7 @@
     <key>LSSupportsOpeningDocumentsInPlace</key>
     <true/>
     <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>用于将下载的 Pixiv 作品保存到相册。</string>
+    <string>Used to save downloaded Pixiv artworks to your photo library.</string>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
     <key>UIFileSharingEnabled</key>

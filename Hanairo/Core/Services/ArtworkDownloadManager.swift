@@ -460,7 +460,7 @@ final class ArtworkDownloadManager {
         let invalid = CharacterSet(charactersIn: "/\\:*?\"<>|")
         let components = value.components(separatedBy: invalid)
         let result = components.joined(separator: "_").trimmingCharacters(in: .whitespacesAndNewlines)
-        return String((result.isEmpty ? "未命名作品" : result).prefix(100))
+        return String((result.isEmpty ? "Untitled Artwork" : result).prefix(100))
     }
 
     private static func safeExtension(_ value: String) -> String {

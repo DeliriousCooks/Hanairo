@@ -12,10 +12,10 @@ struct DownloadedArtworkDetailView: View {
             if let record {
                 recordContent(record)
             } else {
-                ContentUnavailableView("下载记录不存在", systemImage: "questionmark.folder")
+                ContentUnavailableView("Download Record Not Found", systemImage: "questionmark.folder")
             }
         }
-        .navigationTitle("下载详情")
+        .navigationTitle("Download Details")
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(item: $viewer) { context in
             DownloadedPageViewer(context: context)
@@ -38,9 +38,9 @@ struct DownloadedArtworkDetailView: View {
 
                 if record.destination == .photoLibrary {
                     ContentUnavailableView(
-                        "图片已保存到相册",
+                        "Images Saved to Photo Library",
                         systemImage: "photo.on.rectangle",
-                        description: Text("Hanairo 只保留下载记录，不会重复保存相册图片。")
+                        description: Text("Hanairo only keeps the download record and won't save photo library images again.")
                     )
                     .frame(minHeight: 260)
                 } else {
@@ -63,7 +63,7 @@ struct DownloadedArtworkDetailView: View {
                                 .buttonStyle(.plain)
 
                                 ShareLink(item: url) {
-                                    Label("导出第 \(page.pageIndex + 1) 页", systemImage: "square.and.arrow.up")
+                                    Label("Export Page \(page.pageIndex + 1)", systemImage: "square.and.arrow.up")
                                 }
                                 .buttonStyle(.bordered)
                             }
@@ -72,7 +72,7 @@ struct DownloadedArtworkDetailView: View {
                                 .frame(height: 180)
                                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                                 .overlay {
-                                    Text("第 \(page.pageIndex + 1) 页文件不存在")
+                                    Text("File for page \(page.pageIndex + 1) not found")
                                         .foregroundStyle(.secondary)
                                 }
                         }
@@ -80,7 +80,7 @@ struct DownloadedArtworkDetailView: View {
                 }
 
                 NavigationLink(value: AppRoute.illustration(id: record.illustrationID)) {
-                    Label("查看在线作品", systemImage: "arrow.up.right.square")
+                    Label("View Artwork Online", systemImage: "arrow.up.right.square")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -127,7 +127,7 @@ private struct DownloadedPageViewer: View {
             .buttonStyle(.plain)
             .padding(.top, 12)
             .padding(.leading, 14)
-            .accessibilityLabel("关闭")
+            .accessibilityLabel("Close")
         }
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)

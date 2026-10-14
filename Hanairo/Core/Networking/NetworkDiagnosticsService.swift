@@ -9,9 +9,9 @@ enum NetworkDiagnosticState: Equatable {
 
     var title: String {
         switch self {
-        case .idle: "尚未测试"
-        case .testing: "正在测试"
-        case let .succeeded(milliseconds): "成功 · \(milliseconds) ms"
+        case .idle: "Not tested"
+        case .testing: "Testing"
+        case let .succeeded(milliseconds): "Success · \(milliseconds) ms"
         case let .failed(message): message
         }
     }

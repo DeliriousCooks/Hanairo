@@ -10,9 +10,9 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .system: "跟随系统"
-        case .light: "浅色"
-        case .dark: "深色"
+        case .system: "Follow System"
+        case .light: "Light"
+        case .dark: "Dark"
         }
     }
 
@@ -34,9 +34,9 @@ enum ArtworkImageQuality: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .medium: "标准"
-        case .large: "高清"
-        case .original: "原图"
+        case .medium: "Standard"
+        case .large: "High"
+        case .original: "Original"
         }
     }
 }
@@ -49,8 +49,8 @@ enum ArtworkDownloadDestination: String, CaseIterable, Identifiable, Codable, Se
 
     var title: String {
         switch self {
-        case .files: "文件（Hanairo Downloads）"
-        case .photoLibrary: "相册"
+        case .files: "Files (Hanairo Downloads)"
+        case .photoLibrary: "Photo Library"
         }
     }
 }

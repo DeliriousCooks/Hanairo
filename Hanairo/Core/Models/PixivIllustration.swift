@@ -100,7 +100,7 @@ struct PixivIllustration: Codable, Identifiable, Hashable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(Int.self, forKey: .id)
-        title = try container.decodeIfPresent(String.self, forKey: .title) ?? "未命名作品"
+        title = try container.decodeIfPresent(String.self, forKey: .title) ?? "Untitled Artwork"
         type = try container.decodeIfPresent(String.self, forKey: .type) ?? "illust"
         imageURLs = try container.decodeIfPresent(PixivImageURLs.self, forKey: .imageURLs) ?? .empty
         caption = try container.decodeIfPresent(String.self, forKey: .caption) ?? ""

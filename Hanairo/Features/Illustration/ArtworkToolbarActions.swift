@@ -22,12 +22,12 @@ struct ArtworkToolbarActions: ToolbarContent {
                     )
             }
             .disabled(isChangingBookmark)
-            .accessibilityLabel(isBookmarked ? "取消收藏" : "收藏")
+            .accessibilityLabel(isBookmarked ? "Remove bookmark" : "Bookmark")
 
             ShareLink(item: shareURL) {
                 Image(systemName: "square.and.arrow.up")
             }
-            .accessibilityLabel("分享作品")
+            .accessibilityLabel("Share artwork")
 
             downloadControl
         }
@@ -36,17 +36,17 @@ struct ArtworkToolbarActions: ToolbarContent {
     private var downloadControl: some View {
         Menu {
             Button(
-                pageCount > 1 ? "下载全部 \(pageCount) 页" : "下载作品",
+                pageCount > 1 ? "Download All \(pageCount) Pages" : "Download Artwork",
                 systemImage: "square.and.arrow.down"
             ) {
                 onDownloadAll()
             }
 
             Divider()
-            Button("保存为 ZIP", systemImage: "doc.zipper") {
+            Button("Save as ZIP", systemImage: "doc.zipper") {
                 onExportZIP()
             }
-            Button("保存为 PDF", systemImage: "doc.richtext") {
+            Button("Save as PDF", systemImage: "doc.richtext") {
                 onExportPDF()
             }
         } label: {
@@ -58,6 +58,6 @@ struct ArtworkToolbarActions: ToolbarContent {
             }
         }
         .disabled(isPreparingExport)
-        .accessibilityLabel(isPreparingExport ? "正在生成导出文件" : "下载作品")
+        .accessibilityLabel(isPreparingExport ? "Generating export file" : "Download Artwork")
     }
 }

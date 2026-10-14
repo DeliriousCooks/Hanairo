@@ -26,19 +26,19 @@ struct LoginView: View {
             .frame(maxWidth: 500)
             .frame(maxWidth: .infinity)
         }
-        .navigationTitle("登录")
+        .navigationTitle("Sign In")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 NavigationLink {
                     SettingsView()
                 } label: {
-                    Label("设置", systemImage: "gearshape")
+                    Label("Settings", systemImage: "gearshape")
                 }
 
                 NavigationLink {
                     AboutView()
                 } label: {
-                    Label("关于", systemImage: "info.circle")
+                    Label("About", systemImage: "info.circle")
                 }
             }
         }
@@ -52,7 +52,7 @@ struct LoginView: View {
                 .accessibilityHidden(true)
             Text("Hanairo")
                 .font(.largeTitle.bold())
-            Text("登录 Pixiv 后即可浏览推荐、排行榜、收藏与关注内容。")
+            Text("Sign in to Pixiv to browse recommendations, rankings, bookmarks, and followed content.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
         }
@@ -64,7 +64,7 @@ struct LoginView: View {
                 Task { await authorize(using: .login) }
             } label: {
                 actionLabel(
-                    title: "登录 Pixiv",
+                    title: "Sign In to Pixiv",
                     systemImage: "person.crop.circle.badge.checkmark",
                     isActive: activeFlow == .login
                 )
@@ -75,7 +75,7 @@ struct LoginView: View {
                 Task { await authorize(using: .accountCreation) }
             } label: {
                 actionLabel(
-                    title: "注册 Pixiv 账户",
+                    title: "Create a Pixiv Account",
                     systemImage: "person.badge.plus",
                     isActive: activeFlow == .accountCreation
                 )
@@ -85,7 +85,7 @@ struct LoginView: View {
             NavigationLink {
                 TokenLoginView()
             } label: {
-                Text("使用 Refresh Token 登录")
+                Text("Sign In with Refresh Token")
                     .font(.callout)
                     .foregroundStyle(.blue)
             }
@@ -98,9 +98,9 @@ struct LoginView: View {
 
     private var privacyNote: some View {
         VStack(spacing: 8) {
-            Text("登录页由 Apple 系统安全浏览会话打开。Hanairo 不会接触你的 Pixiv 密码，令牌只保存在系统钥匙串中。")
+            Text("The sign-in page opens in a secure Apple system browser session. Hanairo never sees your Pixiv password, and tokens are stored only in the system Keychain.")
                 .multilineTextAlignment(.center)
-            Link("Pixiv 服务条款", destination: URL(string: "https://www.pixiv.net/terms/?page=term")!)
+            Link("Pixiv Terms of Service", destination: URL(string: "https://www.pixiv.net/terms/?page=term")!)
         }
         .font(.footnote)
         .foregroundStyle(.secondary)
@@ -121,7 +121,7 @@ struct LoginView: View {
             } else {
                 Image(systemName: systemImage)
             }
-            Text(isActive ? "正在等待 Pixiv…" : title)
+            Text(isActive ? "Waiting for Pixiv…" : title)
         }
         .frame(maxWidth: .infinity)
     }
@@ -156,7 +156,7 @@ struct LoginView: View {
     }
 }
 
-#Preview("登录") {
+#Preview("Sign In") {
     NavigationStack {
         LoginView()
     }

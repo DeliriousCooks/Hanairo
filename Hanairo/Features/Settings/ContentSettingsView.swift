@@ -8,18 +8,18 @@ struct ContentSettingsView: View {
 
         Form {
             Section {
-                Toggle("显示 AI 生成作品", isOn: $settings.showsAIArtwork)
-                Toggle("显示成人向作品", isOn: $settings.showsMatureArtwork)
+                Toggle("Show AI-Generated Artworks", isOn: $settings.showsAIArtwork)
+                Toggle("Show Adult Artworks", isOn: $settings.showsMatureArtwork)
             } footer: {
-                Text("过滤设置会在下一次刷新列表时生效。成人向内容默认关闭。")
+                Text("Filter settings take effect the next time a list is refreshed. Adult content is off by default.")
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("内容过滤")
+        .navigationTitle("Content Filtering")
     }
 }
 
-#Preview("内容过滤") {
+#Preview("Content Filtering") {
     NavigationStack {
         ContentSettingsView()
     }

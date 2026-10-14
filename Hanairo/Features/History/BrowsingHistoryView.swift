@@ -13,7 +13,7 @@ struct BrowsingHistoryView: View {
         ScrollView {
             if filteredEntries.isEmpty {
                 ContentUnavailableView(
-                    normalizedQuery.isEmpty ? "暂无浏览历史" : "没有匹配的历史记录",
+                    normalizedQuery.isEmpty ? "No Browsing History" : "No Matching History",
                     systemImage: "clock.arrow.circlepath"
                 )
                 .frame(minHeight: 420)
@@ -33,15 +33,15 @@ struct BrowsingHistoryView: View {
                 .padding()
             }
         }
-        .navigationTitle("浏览历史")
+        .navigationTitle("Browsing History")
         .searchable(
             text: $query,
             placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "搜索标题或作者"
+            prompt: "Search title or artist"
         )
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("清空", systemImage: "trash", role: .destructive) {
+                Button("Clear", systemImage: "trash", role: .destructive) {
                     showsClearConfirmation = true
                 }
                 .labelStyle(.iconOnly)
@@ -49,19 +49,19 @@ struct BrowsingHistoryView: View {
             }
         }
         .confirmationDialog(
-            "清空全部浏览历史？",
+            "Clear all browsing history?",
             isPresented: $showsClearConfirmation,
             titleVisibility: .visible
         ) {
-            Button("清空", role: .destructive) { history.clear() }
-            Button("取消", role: .cancel) {}
+            Button("Clear", role: .destructive) { history.clear() }
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("此操作不会删除缓存或已下载的图片。")
+            Text("This won't delete cached or downloaded images.")
         }
-        .alert("操作失败", isPresented: errorBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Action Failed", isPresented: errorBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(actionError ?? "未知错误")
+            Text(actionError ?? "Unknown error")
         }
     }
 
@@ -119,7 +119,7 @@ private struct HistoryArtworkCard: View {
                     onBookmark: onBookmark
                 )
                 Menu {
-                    Button("从历史中移除", systemImage: "trash", role: .destructive) {
+                    Button("Remove from History", systemImage: "trash", role: .destructive) {
                         onRemove()
                     }
                 } label: {
@@ -138,7 +138,7 @@ private struct HistoryArtworkCard: View {
     }
 }
 
-#Preview("浏览历史") {
+#Preview("Browsing History") {
     NavigationStack {
         BrowsingHistoryView()
     }

@@ -29,16 +29,16 @@ private struct AppLaunchExperienceModifier: ViewModifier {
                 await handleLaunch()
             }
             .confirmationDialog(
-                "喜欢 Hanairo 吗？",
+                "Enjoying Hanairo?",
                 isPresented: $showsRecommendationDialog,
                 titleVisibility: .visible
             ) {
-                Button("分享 Hanairo") {
+                Button("Share Hanairo") {
                     shareApplication()
                 }
-                Button("还是算了") {}
+                Button("Not Now") {}
             } message: {
-                Text("如果 Hanairo 对你有帮助，欢迎把它推荐给更多人。你的分享会帮助项目被更多用户发现。")
+                Text("If Hanairo has been useful to you, consider recommending it to others. Sharing helps more people discover the project.")
             }
             .onChange(of: showsRecommendationDialog) { _, isPresented in
                 guard !isPresented else { return }
@@ -55,14 +55,14 @@ private struct AppLaunchExperienceModifier: ViewModifier {
             }
             .alert(item: $automaticUpdateAlert) { alert in
                 Alert(
-                    title: Text("发现新版本"),
+                    title: Text("New Version Available"),
                     message: Text(
-                        "当前版本 \(alert.currentVersion)，最新版本 \(alert.latestVersion)。可以前往发布页查看更新内容。"
+                        "Current version: \(alert.currentVersion). Latest version: \(alert.latestVersion). You can view what's new on the releases page."
                     ),
-                    primaryButton: .default(Text("打开发布页")) {
+                    primaryButton: .default(Text("Open Releases Page")) {
                         openURL(alert.releaseURL)
                     },
-                    secondaryButton: .cancel(Text("稍后"))
+                    secondaryButton: .cancel(Text("Later"))
                 )
             }
 #if os(iOS)
@@ -70,7 +70,7 @@ private struct AppLaunchExperienceModifier: ViewModifier {
                 Task { await checkForUpdatesOnLaunch() }
             }) {
                 ApplicationRecommendationShareSheet(
-                    activityItems: ["我正在使用 Hanairo，推荐你也试试！", AppUpdateService.repositoryURL]
+                    activityItems: ["I'm using Hanairo — you should try it too!", AppUpdateService.repositoryURL]
                 )
             }
 #endif
@@ -115,7 +115,7 @@ private struct AppLaunchExperienceModifier: ViewModifier {
                 releaseURL: result.releaseURL
             )
         } catch {
-            // 自动检查失败时不打断启动流程。
+            // Don't interrupt launch if the automatic check fails.
         }
     }
 

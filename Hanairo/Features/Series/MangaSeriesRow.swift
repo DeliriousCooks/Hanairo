@@ -54,11 +54,11 @@ struct MangaSeriesRow: View {
                             .font(.title2)
                             .foregroundStyle(.tint)
                     }
-                    .accessibilityLabel("查看最新一话")
+                    .accessibilityLabel("View latest chapter")
                 }
 
                 Menu {
-                    Button("取消追更", systemImage: "minus.circle", role: .destructive) {
+                    Button("Stop Watching", systemImage: "minus.circle", role: .destructive) {
                         remove()
                     }
                 } label: {
@@ -71,7 +71,7 @@ struct MangaSeriesRow: View {
                     }
                 }
                 .disabled(isRemoving)
-                .accessibilityLabel("系列操作")
+                .accessibilityLabel("Series actions")
             }
         }
         .padding(.vertical, 6)

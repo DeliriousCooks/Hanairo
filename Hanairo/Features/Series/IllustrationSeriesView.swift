@@ -13,7 +13,7 @@ struct IllustrationSeriesView: View {
         Group {
             switch store.detailState {
             case .idle, .loading:
-                ProgressView("正在加载系列…")
+                ProgressView("Loading series…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case let .failed(message):
                 ErrorStateView(message: message) {
@@ -23,7 +23,7 @@ struct IllustrationSeriesView: View {
                 seriesContent(detail)
             }
         }
-        .navigationTitle("插画系列")
+        .navigationTitle("Illustration Series")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: requestKey) {
             await store.loadIfNeeded(
@@ -38,14 +38,14 @@ struct IllustrationSeriesView: View {
                     ShareLink(item: shareURL) {
                         Image(systemName: "square.and.arrow.up")
                     }
-                    .accessibilityLabel("分享系列")
+                    .accessibilityLabel("Share series")
                 }
             }
         }
-        .alert("操作失败", isPresented: actionErrorBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Action Failed", isPresented: actionErrorBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(displayedError ?? "未知错误")
+            Text(displayedError ?? "Unknown error")
         }
     }
 
@@ -62,7 +62,7 @@ struct IllustrationSeriesView: View {
                     onToggleWatch: toggleWatch
                 )
 
-                Text("系列作品")
+                Text("Series Artworks")
                     .font(.title2.weight(.bold))
 
                 worksContent
@@ -91,7 +91,7 @@ struct IllustrationSeriesView: View {
             .frame(minHeight: 260)
         case .loaded:
             if store.works.items.isEmpty {
-                ContentUnavailableView("系列暂无作品", systemImage: "books.vertical")
+                ContentUnavailableView("No Artworks in This Series", systemImage: "books.vertical")
                     .frame(minHeight: 260)
             } else {
                 ArtworkGrid(
@@ -184,7 +184,7 @@ private struct IllustrationSeriesHeader: View {
                 .textSelection(.enabled)
 
             HStack {
-                Label("\(detail.seriesWorkCount) 话", systemImage: "books.vertical")
+                Label("\(detail.seriesWorkCount) chapters", systemImage: "books.vertical")
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button(action: onToggleWatch) {
@@ -194,7 +194,7 @@ private struct IllustrationSeriesHeader: View {
                             .frame(minWidth: 96)
                     } else {
                         Label(
-                            isWatching ? "已追更" : "追更",
+                            isWatching ? "Watching" : "Watch",
                             systemImage: isWatching ? "checkmark.circle.fill" : "plus.circle"
                         )
                         .frame(minWidth: 96)
@@ -235,7 +235,7 @@ private struct IllustrationSeriesHeader: View {
     }
 }
 
-#Preview("插画系列") {
+#Preview("Illustration Series") {
     NavigationStack {
         IllustrationSeriesView(seriesID: 266067)
     }

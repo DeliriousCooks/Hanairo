@@ -18,15 +18,15 @@ struct BookmarkEditorSheet: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle("编辑收藏")
+                .navigationTitle("Edit Bookmark")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("取消") { dismiss() }
+                        Button("Cancel") { dismiss() }
                             .disabled(isSaving)
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("保存") { save() }
+                        Button("Save") { save() }
                             .disabled(!isLoaded || isSaving)
                     }
                 }
@@ -35,10 +35,10 @@ struct BookmarkEditorSheet: View {
         .task(id: illustration.id) {
             await load()
         }
-        .alert("操作失败", isPresented: errorBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Action Failed", isPresented: errorBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(errorMessage ?? "未知错误")
+            Text(errorMessage ?? "Unknown error")
         }
     }
 
@@ -46,7 +46,7 @@ struct BookmarkEditorSheet: View {
     private var content: some View {
         switch phase {
         case .idle, .loading:
-            ProgressView("正在加载收藏信息…")
+            ProgressView("Loading bookmark info…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case let .failed(message):
             ErrorStateView(message: message) {
@@ -54,8 +54,8 @@ struct BookmarkEditorSheet: View {
             }
         case let .loaded(detail):
             Form {
-                Section("可见范围") {
-                    Picker("收藏范围", selection: $visibility) {
+                Section("Visibility") {
+                    Picker("Bookmark Visibility", selection: $visibility) {
                         ForEach(PixivVisibility.allCases) { visibility in
                             Text(visibility.title).tag(visibility)
                         }
@@ -65,17 +65,17 @@ struct BookmarkEditorSheet: View {
 
                 Section {
                     HStack {
-                        TextField("新增标签", text: $newTag)
+                        TextField("New Tag", text: $newTag)
                             .submitLabel(.done)
                             .onSubmit(addTag)
-                        Button("添加", action: addTag)
+                        Button("Add", action: addTag)
                             .disabled(normalizedNewTag.isEmpty)
                     }
                 } header: {
                     HStack {
-                        Text("标签")
+                        Text("Tags")
                         Spacer()
-                        Button(selectedTags.count == tags.count ? "取消全选" : "全选") {
+                        Button(selectedTags.count == tags.count ? "Deselect All" : "Select All") {
                             toggleAllTags()
                         }
                         .textCase(nil)
@@ -84,7 +84,7 @@ struct BookmarkEditorSheet: View {
 
                 Section {
                     if tags.isEmpty {
-                        ContentUnavailableView("暂无标签", systemImage: "tag")
+                        ContentUnavailableView("No Tags", systemImage: "tag")
                     } else {
                         ForEach(tags, id: \.name) { tag in
                             Button {
@@ -106,12 +106,12 @@ struct BookmarkEditorSheet: View {
                         }
                     }
                 } footer: {
-                    Text("已选择 \(selectedTags.count) 个标签")
+                    Text("\(selectedTags.count) tags selected")
                 }
 
                 if detail.isBookmarked {
                     Section {
-                        Button("取消收藏", role: .destructive) {
+                        Button("Remove Bookmark", role: .destructive) {
                             removeBookmark()
                         }
                         .disabled(isSaving)

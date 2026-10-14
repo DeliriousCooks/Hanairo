@@ -5,7 +5,7 @@ enum PixivArtworkType: String, CaseIterable, Identifiable, Codable, Sendable {
     case manga
 
     var id: String { rawValue }
-    var title: String { self == .illustration ? "插画" : "漫画" }
+    var title: String { self == .illustration ? "Illustration" : "Manga" }
 }
 
 struct PixivUser: Codable, Identifiable, Hashable, Sendable {

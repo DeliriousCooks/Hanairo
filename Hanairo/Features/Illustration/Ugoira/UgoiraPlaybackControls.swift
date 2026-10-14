@@ -20,7 +20,7 @@ struct UgoiraPlaybackControls: View {
 
     private var controls: some View {
         HStack(spacing: 2) {
-            Button(player.isPlaying ? "暂停" : "播放", systemImage: player.isPlaying ? "pause.fill" : "play.fill") {
+            Button(player.isPlaying ? "Pause" : "Play", systemImage: player.isPlaying ? "pause.fill" : "play.fill") {
                 player.togglePlayback()
             }
             .labelStyle(.iconOnly)
@@ -36,7 +36,7 @@ struct UgoiraPlaybackControls: View {
                     player.setSuspended(isEditing, reason: .seeking)
                 }
                 .frame(minWidth: 76, maxWidth: 170)
-                .accessibilityLabel("动图进度")
+                .accessibilityLabel("Ugoira progress")
 
                 Text("\(player.currentFrameIndex + 1)/\(player.frameCount)")
                     .font(.caption2.monospacedDigit())
@@ -62,10 +62,10 @@ struct UgoiraPlaybackControls: View {
                     .frame(width: 40, height: 36)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("播放速度")
+            .accessibilityLabel("Playback speed")
 
             if let onFullscreen {
-                Button("全屏", systemImage: "arrow.up.left.and.arrow.down.right") {
+                Button("Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") {
                     onFullscreen()
                 }
                 .labelStyle(.iconOnly)

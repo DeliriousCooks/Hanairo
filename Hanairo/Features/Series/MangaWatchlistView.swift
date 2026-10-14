@@ -15,17 +15,17 @@ struct MangaWatchlistView: View {
             .padding(.horizontal)
             .padding(.bottom, 24)
         }
-        .navigationTitle("漫画追更")
+        .navigationTitle("Manga Watchlist")
         .task(id: requestKey) {
             await loadIfNeeded()
         }
         .refreshable {
             await reload(showsInitialLoading: false)
         }
-        .alert("操作失败", isPresented: errorBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Action Failed", isPresented: errorBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(displayedError ?? "未知错误")
+            Text(displayedError ?? "Unknown error")
         }
     }
 
@@ -33,7 +33,7 @@ struct MangaWatchlistView: View {
     private var content: some View {
         switch series.phase {
         case .idle, .loading:
-            ProgressView("正在加载追更列表…")
+            ProgressView("Loading watchlist…")
                 .frame(maxWidth: .infinity, minHeight: 360)
         case let .failed(message):
             ErrorStateView(message: message) {
@@ -43,9 +43,9 @@ struct MangaWatchlistView: View {
         case .loaded:
             if series.items.isEmpty {
                 ContentUnavailableView(
-                    "还没有追更系列",
+                    "No Watched Series Yet",
                     systemImage: "books.vertical",
-                    description: Text("在漫画系列页面可以加入追更。")
+                    description: Text("You can add a series to your watchlist from its manga series page.")
                 )
                 .frame(minHeight: 360)
             } else {
@@ -121,7 +121,7 @@ struct MangaWatchlistView: View {
     }
 }
 
-#Preview("漫画追更") {
+#Preview("Manga Watchlist") {
     NavigationStack {
         MangaWatchlistView()
     }

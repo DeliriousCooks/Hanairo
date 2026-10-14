@@ -12,7 +12,7 @@ struct BookmarkTagFilterView: View {
     var body: some View {
         ScrollView(.horizontal) {
             LazyHStack(spacing: 8) {
-                tagButton(title: "全部", count: nil, tag: nil)
+                tagButton(title: "All", count: nil, tag: nil)
 
                 ForEach(tags) { tag in
                     tagButton(title: tag.name, count: tag.count, tag: tag.name)
@@ -54,7 +54,7 @@ struct BookmarkTagFilterView: View {
                 .controlSize(.small)
                 .padding(.horizontal, 8)
         case .failed:
-            Button("重试") {
+            Button("Retry") {
                 Task { await onRetry() }
             }
             .buttonStyle(.bordered)
@@ -65,7 +65,7 @@ struct BookmarkTagFilterView: View {
                     .controlSize(.small)
                     .padding(.horizontal, 8)
             } else if errorMessage != nil {
-                Button("重试") {
+                Button("Retry") {
                     Task { await onLoadMore() }
                 }
                 .buttonStyle(.bordered)

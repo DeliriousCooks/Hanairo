@@ -20,7 +20,7 @@ struct TokenLoginView: View {
             submitSection
         }
         .formStyle(.grouped)
-        .navigationTitle("令牌登录")
+        .navigationTitle("Token Sign-In")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 PasteButton(payloadType: String.self) { values in
@@ -29,8 +29,8 @@ struct TokenLoginView: View {
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
-                .accessibilityLabel("粘贴令牌")
-                .help("粘贴令牌")
+                .accessibilityLabel("Paste Token")
+                .help("Paste Token")
             }
         }
         .onAppear {
@@ -43,9 +43,9 @@ struct TokenLoginView: View {
         Section {
             Group {
                 if revealsToken {
-                    TextField("粘贴 Refresh Token", text: $refreshToken)
+                    TextField("Paste Refresh Token", text: $refreshToken)
                 } else {
-                    SecureField("粘贴 Refresh Token", text: $refreshToken)
+                    SecureField("Paste Refresh Token", text: $refreshToken)
                 }
             }
             .focused($isTokenFieldFocused)
@@ -54,16 +54,16 @@ struct TokenLoginView: View {
                 Task { await signIn() }
             }
 
-            Toggle("显示令牌", isOn: $revealsToken)
+            Toggle("Show Token", isOn: $revealsToken)
 
             if !normalizedToken.isEmpty {
-                LabeledContent("字符数", value: normalizedToken.count.formatted())
+                LabeledContent("Character Count", value: normalizedToken.count.formatted())
                     .foregroundStyle(.secondary)
             }
         } header: {
             Text("Refresh Token")
         } footer: {
-            Text("令牌只会保存在系统钥匙串中，请勿与他人分享。")
+            Text("The token is stored only in the system Keychain. Don't share it with anyone.")
         }
     }
 
@@ -76,9 +76,9 @@ struct TokenLoginView: View {
                     Spacer()
                     if authentication.isAuthenticating {
                         ProgressView()
-                        Text("正在验证…")
+                        Text("Verifying…")
                     } else {
-                        Label("登录", systemImage: "arrow.right.circle.fill")
+                        Label("Sign In", systemImage: "arrow.right.circle.fill")
                     }
                     Spacer()
                 }
@@ -108,7 +108,7 @@ struct TokenLoginView: View {
     }
 }
 
-#Preview("令牌登录") {
+#Preview("Token Sign-In") {
     NavigationStack {
         TokenLoginView()
     }

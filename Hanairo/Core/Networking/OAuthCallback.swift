@@ -34,9 +34,9 @@ private enum OAuthCallbackError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .authorizationDenied(message):
-            "Pixiv 未完成授权：\(message)"
+            "Pixiv did not complete authorization: \(message)"
         case .invalidCallback:
-            "Pixiv 返回的登录结果无效"
+            "Pixiv returned an invalid sign-in result"
         }
     }
 }

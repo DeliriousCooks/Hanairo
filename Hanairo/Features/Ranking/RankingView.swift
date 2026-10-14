@@ -36,7 +36,7 @@ struct RankingView: View {
                 await refresh()
             }
         }
-        .navigationTitle("排行榜")
+        .navigationTitle("Rankings")
         .task(id: requestKey) {
             await loadIfNeeded()
         }
@@ -45,10 +45,10 @@ struct RankingView: View {
                 mode = .daily
             }
         }
-        .alert("操作失败", isPresented: actionErrorBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Action Failed", isPresented: actionErrorBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(displayedError ?? "未知错误")
+            Text(displayedError ?? "Unknown error")
         }
     }
 
@@ -74,9 +74,9 @@ struct RankingView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            DisclosureGroup("指定日期", isExpanded: $usesCustomDate) {
+            DisclosureGroup("Specific Date", isExpanded: $usesCustomDate) {
                 DatePicker(
-                    "排行日期",
+                    "Ranking Date",
                     selection: $selectedDate,
                     in: ...Date(),
                     displayedComponents: .date
@@ -97,7 +97,7 @@ struct RankingView: View {
                             .frame(width: 20)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("排行类型")
+                            Text("Ranking Type")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Text(mode.title)
@@ -119,7 +119,7 @@ struct RankingView: View {
                 .buttonStyle(.plain)
 
                 Toggle(isOn: $usesCustomDate) {
-                    Label("指定日期", systemImage: "calendar")
+                    Label("Specific Date", systemImage: "calendar")
                         .font(.subheadline.weight(.semibold))
                 }
                 .toggleStyle(.button)
@@ -127,7 +127,7 @@ struct RankingView: View {
 
                 if usesCustomDate {
                     DatePicker(
-                        "排行日期",
+                        "Ranking Date",
                         selection: $selectedDate,
                         in: ...Date(),
                         displayedComponents: .date
@@ -158,7 +158,7 @@ struct RankingView: View {
     }
 
     private var rankingModePicker: some View {
-        Picker("排行榜", selection: $mode) {
+        Picker("Rankings", selection: $mode) {
             ForEach(availableModes) { mode in
                 Label(mode.title, systemImage: mode.systemImage)
                     .tag(mode)
@@ -187,7 +187,7 @@ struct RankingView: View {
             .frame(minHeight: 360)
         case .loaded:
             if feed.items.isEmpty {
-                ContentUnavailableView("暂无排行数据", systemImage: "trophy")
+                ContentUnavailableView("No Ranking Data", systemImage: "trophy")
                     .frame(minHeight: 360)
             } else {
                 ArtworkMasonryGrid(
@@ -312,35 +312,35 @@ private enum RankingMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .daily: "日榜"
-        case .male: "男性热门"
-        case .female: "女性热门"
-        case .original: "原创榜"
-        case .rookie: "新人榜"
-        case .weekly: "周榜"
-        case .monthly: "月榜"
-        case .ai: "AI 日榜"
-        case .matureAI: "AI R-18 日榜"
-        case .matureDaily: "R-18 日榜"
-        case .matureWeekly: "R-18 周榜"
-        case .matureG: "R-18G 周榜"
+        case .daily: "Daily"
+        case .male: "Popular with Men"
+        case .female: "Popular with Women"
+        case .original: "Original"
+        case .rookie: "Rookie"
+        case .weekly: "Weekly"
+        case .monthly: "Monthly"
+        case .ai: "AI Daily"
+        case .matureAI: "AI R-18 Daily"
+        case .matureDaily: "R-18 Daily"
+        case .matureWeekly: "R-18 Weekly"
+        case .matureG: "R-18G Weekly"
         }
     }
 
     var description: String {
         switch self {
-        case .daily: "Pixiv 全站每日综合排名"
-        case .male: "男性用户关注度较高的每日作品"
-        case .female: "女性用户关注度较高的每日作品"
-        case .original: "最近一周的原创作品排名"
-        case .rookie: "最近一周的新锐作者作品排名"
-        case .weekly: "最近一周的综合排名"
-        case .monthly: "最近一个月的综合排名"
-        case .ai: "AI 生成作品每日排名"
-        case .matureAI: "成人向 AI 生成作品每日排名"
-        case .matureDaily: "成人向作品每日排名"
-        case .matureWeekly: "成人向作品每周排名"
-        case .matureG: "高限制级作品每周排名"
+        case .daily: "Overall daily ranking across Pixiv"
+        case .male: "Daily artworks most popular with male users"
+        case .female: "Daily artworks most popular with female users"
+        case .original: "Original artworks ranking over the past week"
+        case .rookie: "Rising artists' ranking over the past week"
+        case .weekly: "Overall ranking over the past week"
+        case .monthly: "Overall ranking over the past month"
+        case .ai: "Daily ranking of AI-generated artworks"
+        case .matureAI: "Daily ranking of adult AI-generated artworks"
+        case .matureDaily: "Daily ranking of adult artworks"
+        case .matureWeekly: "Weekly ranking of adult artworks"
+        case .matureG: "Weekly ranking of R-18G (extreme) artworks"
         }
     }
 
@@ -362,7 +362,7 @@ private enum RankingMode: String, CaseIterable, Identifiable {
     }
 }
 
-#Preview("排行榜预览") {
+#Preview("Rankings Preview") {
     NavigationStack {
         RankingView()
     }

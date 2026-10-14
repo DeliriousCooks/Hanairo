@@ -8,8 +8,8 @@ enum PixivVisibility: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var title: String {
         switch self {
-        case .public: "公开"
-        case .private: "非公开"
+        case .public: "Public"
+        case .private: "Private"
         }
     }
 }
@@ -23,9 +23,9 @@ enum FollowingFeedScope: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .all: "全部"
-        case .public: "公开关注"
-        case .private: "非公开关注"
+        case .all: "All"
+        case .public: "Public Following"
+        case .private: "Private Following"
         }
     }
 }
@@ -38,15 +38,15 @@ enum UserConnectionKind: String, CaseIterable, Identifiable, Hashable, Sendable 
 
     var title: String {
         switch self {
-        case .following: "关注"
-        case .followers: "粉丝"
+        case .following: "Following"
+        case .followers: "Followers"
         }
     }
 
     var emptyTitle: String {
         switch self {
-        case .following: "暂无关注用户"
-        case .followers: "暂无粉丝"
+        case .following: "No Following Users Yet"
+        case .followers: "No Followers Yet"
         }
     }
 }

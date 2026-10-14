@@ -82,7 +82,7 @@ final class LocalBlockStore {
                 id: comment.id,
                 authorID: comment.user.id,
                 authorName: comment.user.name,
-                preview: preview.isEmpty ? "表情评论" : String(preview.prefix(48)),
+                preview: preview.isEmpty ? "Stamp comment" : String(preview.prefix(48)),
                 createdAt: Date()
             ),
             at: 0

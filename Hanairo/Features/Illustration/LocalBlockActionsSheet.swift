@@ -16,19 +16,19 @@ struct LocalBlockActionsSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("作品与作者") {
-                    Button("屏蔽作品《\(illustration.title)》", systemImage: "photo.badge.minus", role: .destructive) {
+                Section("Artworks & Artists") {
+                    Button("Block artwork “\(illustration.title)”", systemImage: "photo.badge.minus", role: .destructive) {
                         localBlocks.block(artwork: illustration)
                         finish(.artwork)
                     }
-                    Button("屏蔽作者 \(illustration.user.name)", systemImage: "person.crop.circle.badge.minus", role: .destructive) {
+                    Button("Block artist \(illustration.user.name)", systemImage: "person.crop.circle.badge.minus", role: .destructive) {
                         localBlocks.block(user: illustration.user)
                         finish(.user)
                     }
                 }
 
                 if !illustration.tags.isEmpty {
-                    Section("标签") {
+                    Section("Tags") {
                         ForEach(illustration.tags) { tag in
                             Button {
                                 localBlocks.block(tag: tag)
@@ -49,11 +49,11 @@ struct LocalBlockActionsSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("本地屏蔽")
+            .navigationTitle("Local Blocks")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭") { dismiss() }
+                    Button("Close") { dismiss() }
                 }
             }
         }

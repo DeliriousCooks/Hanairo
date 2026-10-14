@@ -38,22 +38,22 @@ struct ArtworkDownloadTask: Codable, Identifiable, Hashable, Sendable {
     var statusText: String {
         switch status {
         case .queued:
-            "等待下载"
+            "Waiting to download"
         case .downloading:
             if let currentPageIndex {
-                "正在下载第 \(currentPageIndex + 1) 页"
+                "Downloading page \(currentPageIndex + 1)"
             } else {
-                "正在准备"
+                "Preparing"
             }
         case .paused:
-            "已暂停"
+            "Paused"
         case .failed:
-            errorMessage ?? "下载失败"
+            errorMessage ?? "Download failed"
         }
     }
 
     var progressText: String {
-        "\(completedPageIndexes.count)/\(pages.count) 页"
+        "\(completedPageIndexes.count)/\(pages.count) pages"
     }
 }
 
@@ -83,7 +83,7 @@ struct ArtworkDownloadRecord: Codable, Identifiable, Hashable, Sendable {
 
     var detailText: String {
         let size = ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
-        let progress = "\(pages.count)/\(totalArtworkPageCount) 页"
+        let progress = "\(pages.count)/\(totalArtworkPageCount) pages"
         return totalBytes > 0 ? "\(progress) · \(size)" : progress
     }
 
@@ -100,10 +100,10 @@ enum ArtworkDownloadEnqueueResult: Equatable {
 
     var message: String {
         switch self {
-        case let .queued(count): "已加入下载队列：\(count) 页"
-        case .alreadyQueued: "该作品已在下载队列中"
-        case .alreadyDownloaded: "所选图片已经下载"
-        case .noAvailablePages: "没有可用的下载地址"
+        case let .queued(count): "Added to download queue: \(count) pages"
+        case .alreadyQueued: "This artwork is already in the download queue"
+        case .alreadyDownloaded: "The selected images have already been downloaded"
+        case .noAvailablePages: "No download URLs available"
         }
     }
 }

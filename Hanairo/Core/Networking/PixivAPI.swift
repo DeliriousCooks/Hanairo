@@ -6,7 +6,7 @@ final class PixivAPI {
         case manga
 
         var id: String { rawValue }
-        var title: String { self == .illustration ? "插画" : "漫画" }
+        var title: String { self == .illustration ? "Illustration" : "Manga" }
     }
 
     private let client: NetworkClient
@@ -480,11 +480,11 @@ private extension DecodingError {
         case let .dataCorrupted(context):
             return message(context: context)
         case let .keyNotFound(key, context):
-            return "字段 \(path(context.codingPath + [key])) 缺失"
+            return "Field \(path(context.codingPath + [key])) is missing"
         case let .typeMismatch(type, context):
-            return "字段 \(path(context.codingPath)) 类型应为 \(type)"
+            return "Field \(path(context.codingPath)) should be of type \(type)"
         case let .valueNotFound(type, context):
-            return "字段 \(path(context.codingPath)) 缺少 \(type) 值"
+            return "Field \(path(context.codingPath)) is missing a \(type) value"
         @unknown default:
             return localizedDescription
         }
@@ -492,7 +492,7 @@ private extension DecodingError {
 
     private func message(context: Context) -> String {
         let field = path(context.codingPath)
-        return field == "响应" ? context.debugDescription : "字段 \(field)：\(context.debugDescription)"
+        return field == "response" ? context.debugDescription : "Field \(field): \(context.debugDescription)"
     }
 
     private func path(_ codingPath: [CodingKey]) -> String {
@@ -502,6 +502,6 @@ private extension DecodingError {
             }
             return key.stringValue
         }
-        return components.isEmpty ? "响应" : components.joined(separator: ".")
+        return components.isEmpty ? "response" : components.joined(separator: ".")
     }
 }

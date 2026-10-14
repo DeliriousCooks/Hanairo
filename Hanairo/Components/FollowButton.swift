@@ -31,10 +31,10 @@ struct FollowButton: View {
         .task(id: detailRequestKey) {
             await loadFollowDetail()
         }
-        .alert("关注操作失败", isPresented: errorBinding) {
-            Button("好", role: .cancel) {}
+        .alert("Follow Action Failed", isPresented: errorBinding) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(errorMessage ?? "未知错误")
+            Text(errorMessage ?? "Unknown error")
         }
     }
 
@@ -72,14 +72,14 @@ struct FollowButton: View {
                 visibilityButton(.public)
                 visibilityButton(.private)
                 Divider()
-                Button("取消关注", systemImage: "person.fill.xmark", role: .destructive) {
+                Button("Unfollow", systemImage: "person.fill.xmark", role: .destructive) {
                     update(isFollowed: false, visibility: currentVisibility ?? .public)
                 }
             } else {
-                Button("公开关注", systemImage: "person.badge.plus") {
+                Button("Follow Publicly", systemImage: "person.badge.plus") {
                     update(isFollowed: true, visibility: .public)
                 }
-                Button("非公开关注", systemImage: "eye.slash") {
+                Button("Follow Privately", systemImage: "eye.slash") {
                     update(isFollowed: true, visibility: .private)
                 }
             }
@@ -90,13 +90,13 @@ struct FollowButton: View {
                     .frame(minWidth: compact ? 18 : 86)
             } else {
                 Label(
-                    isFollowed ? "已关注" : "关注",
+                    isFollowed ? "Following" : "Follow",
                     systemImage: isFollowed ? "person.fill.checkmark" : "person.badge.plus"
                 )
                 .frame(minWidth: compact ? nil : 86)
             }
         }
-        .accessibilityLabel(isFollowed ? "管理关注" : "关注作者")
+        .accessibilityLabel(isFollowed ? "Manage follow" : "Follow artist")
     }
 
     private func visibilityButton(_ visibility: PixivVisibility) -> some View {

@@ -30,7 +30,7 @@ struct IllustrationMetadataView: View {
             if !illustration.tags.isEmpty {
                 FloatingGlassCard {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("标签")
+                        Text("Tags")
                             .font(.headline)
                         IllustrationTagsView(tags: illustration.tags)
                     }
@@ -49,7 +49,7 @@ private struct IllustrationDescriptionCard: View {
     var body: some View {
         FloatingGlassCard {
             VStack(alignment: .leading, spacing: 10) {
-                Text("作品简介")
+                Text("Caption")
                     .font(.headline)
                 Text(caption)
                     .font(.body)
@@ -73,7 +73,7 @@ private struct IllustrationTitleSection: View {
 
             if let series = illustration.series {
                 NavigationLink(value: AppRoute.illustrationSeries(id: series.id)) {
-                    Label(series.title ?? "查看所属系列", systemImage: "books.vertical")
+                    Label(series.title ?? "View Series", systemImage: "books.vertical")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.tint)
                 }
@@ -100,7 +100,7 @@ private struct IllustrationTitleSection: View {
         }
         Text("ID \(illustration.id)")
         if illustration.pageCount > 1 {
-            Label("\(illustration.pageCount) 页", systemImage: "rectangle.stack")
+            Label("\(illustration.pageCount) pages", systemImage: "rectangle.stack")
         }
         if illustration.aiType == 2 {
             Label("AI", systemImage: "wand.and.stars")
@@ -157,7 +157,7 @@ private struct IllustrationTagsView: View {
                     }
                     .buttonStyle(.plain)
                     .contextMenu {
-                        Button("屏蔽此标签", systemImage: "number", role: .destructive) {
+                        Button("Block This Tag", systemImage: "number", role: .destructive) {
                             localBlocks.block(tag: tag)
                         }
                     }
@@ -173,21 +173,21 @@ private struct IllustrationStatisticsView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            StatLabel(value: illustration.totalViews, title: "浏览")
+            StatLabel(value: illustration.totalViews, title: "Views")
                 .padding(.vertical, 14)
             Divider().frame(height: 32)
-            StatLabel(value: illustration.totalBookmarks, title: "收藏")
+            StatLabel(value: illustration.totalBookmarks, title: "Bookmarks")
                 .padding(.vertical, 14)
             Divider().frame(height: 32)
             Button(action: onComments) {
-                StatLabel(value: illustration.totalComments, title: "评论")
+                StatLabel(value: illustration.totalComments, title: "Comments")
                     .padding(.vertical, 14)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .contentShape(Rectangle())
-            .accessibilityLabel("评论 \(illustration.totalComments)")
-            .accessibilityHint("打开评论区")
+            .accessibilityLabel("Comments \(illustration.totalComments)")
+            .accessibilityHint("Open comments")
         }
     }
 }
